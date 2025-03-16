@@ -25,7 +25,7 @@ A lightweight and optimized version of TFA Base, designed for those who want to 
 
 ### Installation
 
-1. Download or clone this repository into your Garry’s Mod `addons` folder (e.g. `addons/tfa_base_optimized`).
+1. Download or clone this repository into your Garry’s Mod `addons` folder (e.g. `addons/tfa_base`).
 2. Restart your server or client to apply changes.
 
 ### Additional Notes
