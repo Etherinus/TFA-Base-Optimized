@@ -61,6 +61,11 @@ if CLIENT then
 
         wep = ply:GetActiveWeapon()
 
+        if not (IsValid(wep) and wep.IsTFAWeapon) then
+            TFA_RENDERSCREEN = false
+            return
+        end
+
         if oldVmModel ~= vm:GetModel() or (wep ~= oldWep) then
             if IsValid(oldWep) then
                 oldWep.MaterialCached = nil

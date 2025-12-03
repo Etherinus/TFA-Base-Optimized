@@ -64,9 +64,9 @@ if CLIENT then
 end
 
 hook.Add("PreDrawOpaqueRenderables", "tfaweaponspredrawopaque", function()
-    for _, pl in pairs(player.GetAll()) do
+    for _, pl in ipairs(player.GetAll()) do
         local wep = pl:GetActiveWeapon()
-        if IsValid(wep) and wep.PreDrawOpaqueRenderables then
+        if IsValid(wep) and wep.IsTFAWeapon and wep.PreDrawOpaqueRenderables then
             wep:PreDrawOpaqueRenderables()
         end
     end

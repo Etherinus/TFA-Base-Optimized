@@ -12,11 +12,20 @@ local Material = Material
 local type = type
 
 local function dosomething()
-
 end
+
+local HTML_MATERIALS_ENABLED = false
+local fallback_mat = Material("vgui/white")
+local fallback_mat_token = "!" .. fallback_mat:GetName()
 
 function GetHTMLMaterialVL(url, callbackfunc)
     if not CLIENT then return end
+    if not HTML_MATERIALS_ENABLED then
+        if callbackfunc then
+            callbackfunc(fallback_mat_token)
+        end
+        return
+    end
 
     HTMLMaterial(url, HTMLMAT_STYLE_COVER_IMG, function(mat)
         local matdata = {
@@ -126,6 +135,14 @@ local function onImageLoaded(key, browser)
 end
 
 local function enqueueUrl(url, styleName, key, callback)
+    if not HTML_MATERIALS_ENABLED then
+        if type(callback) == "function" then
+            callback(DefaultMat)
+        end
+        cache[key] = DefaultMat
+        return
+    end
+
     cache[key] = DefaultMat
 
     browserpool.get(function(browser)
@@ -163,6 +180,13 @@ local MAT_STR_TABLE = {"", "@", ""}
 
 function HTMLMaterial(url, style, callback)
     if not url then return DefaultMat end
+    if not HTML_MATERIALS_ENABLED then
+        if type(callback) == "function" then
+            callback(DefaultMat)
+        end
+        return DefaultMat
+    end
+
     local key
 
     if style then

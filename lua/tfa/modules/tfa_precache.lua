@@ -1,5 +1,6 @@
 local tmpmat
 local fname
+local precached_dirs = {}
 
 function TFA.PrecacheDirectory(dir, typev)
     if not typev then
@@ -13,6 +14,10 @@ function TFA.PrecacheDirectory(dir, typev)
             typev = "snd"
         end
     end
+
+    local cachekey = string.lower(dir) .. "|" .. tostring(typev)
+    if precached_dirs[cachekey] then return end
+    precached_dirs[cachekey] = true
 
     local files, directories = file.Find(dir .. "*", "GAME")
 
