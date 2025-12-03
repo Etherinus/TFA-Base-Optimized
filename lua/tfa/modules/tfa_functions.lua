@@ -112,6 +112,53 @@ local function addSound(id, path, kind, channel, level)
     end
 end
 
+function TFA.AddSound(id, channel, volume, level, pitch, path, kindv)
+    if not id then return end
+
+    channel = channel or CHAN_AUTO
+    volume = volume or 1
+    level = level or 75
+
+    local sndpath = path
+    local pitchval = pitch
+
+    if sndpath == nil and (isstring(pitch) or istable(pitch)) then
+        sndpath = pitch
+        pitchval = nil
+    end
+
+    if isstring(sndpath) then
+        sndpath = TFA.PatchSound(sndpath, kindv)
+    elseif istable(sndpath) then
+        local patched = {}
+
+        for k, v in pairs(sndpath) do
+            patched[k] = TFA.PatchSound(v, kindv)
+        end
+
+        sndpath = patched
+    else
+        return
+    end
+
+    if not pitchval then
+        pitchval = { 97, 103 }
+    elseif istable(pitchval) then
+        -- already a range
+    else
+        pitchval = { pitchval, pitchval }
+    end
+
+    sound_Add({
+        name = id,
+        channel = channel,
+        volume = volume,
+        level = level,
+        pitch = pitchval,
+        sound = sndpath
+    })
+end
+
 function TFA.AddFireSound(id, path, wrap, kindv)
     local kind = kindv or DefaultSoundChar
     local channel = wrap and SoundChannels.shootwrap or SoundChannels.shoot

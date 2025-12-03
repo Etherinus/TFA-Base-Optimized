@@ -1,5 +1,9 @@
-game.AddParticles("particles/doktor_muzzleflash.pcf")
-PrecacheParticleSystem("VES_fire_1_FP")
+local hasPcf = file.Exists("particles/doktor_muzzleflash.pcf", "GAME")
+
+if hasPcf then
+	game.AddParticles("particles/doktor_muzzleflash.pcf")
+	PrecacheParticleSystem("VES_fire_1_FP")
+end
 
 local function rvec(vec)
 	vec.x = math.Round(vec.x)
@@ -12,6 +16,10 @@ end
 local blankvec = Vector(0, 0, 0)
 
 function EFFECT:Init(data)
+	if not hasPcf then
+		return
+	end
+
 	self.StartPacket = data:GetStart()
 	self.Attachment = data:GetAttachment()
 	local AddVel = vector_origin

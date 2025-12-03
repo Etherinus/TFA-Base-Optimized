@@ -335,26 +335,7 @@ SWEP.IronSightsProgress = 0
 SWEP.SprintProgress = 0
 SWEP.SpreadRatio = 0
 SWEP.CrouchingRatio = 0
-SWEP.SmokeParticles = {
-	pistol = "smoke_trail_controlled",
-	smg = "smoke_trail_tfa",
-	grenade = "smoke_trail_tfa",
-	ar2 = "smoke_trail_tfa",
-	shotgun = "smoke_trail_wild",
-	rpg = "smoke_trail_tfa",
-	physgun = "smoke_trail_tfa",
-	crossbow = "smoke_trail_tfa",
-	melee = "smoke_trail_tfa",
-	slam = "smoke_trail_tfa",
-	normal = "smoke_trail_tfa",
-	melee2 = "smoke_trail_tfa",
-	knife = "smoke_trail_tfa",
-	duel = "smoke_trail_tfa",
-	camera = "smoke_trail_tfa",
-	magic = "smoke_trail_tfa",
-	revolver = "smoke_trail_tfa",
-	silenced = "smoke_trail_controlled"
-}
+SWEP.SmokeParticles = {}
 
 SWEP.Inspecting = false
 SWEP.InspectingProgress = 0
@@ -592,7 +573,7 @@ end
 
 function SWEP:Precache()
 	for k, v in pairs(self.SmokeParticles) do
-		if isstring(v) then
+		if isstring(v) and v ~= "" and TFA.HasParticleSystem and TFA.HasParticleSystem(v) then
 			PrecacheParticleSystem(v)
 		end
 	end

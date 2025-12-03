@@ -5,7 +5,7 @@ function EFFECT:Init(data)
 	self.WeaponEnt = data:GetEntity()
 	if not IsValid(self.WeaponEnt) then return end
 	self.Attachment = data:GetAttachment()
-	local smokepart = "smoke_trail_tfa"
+	local smokepart = "smoke_trail"
 
 	if self.WeaponEnt.SmokeParticles then
 		smokepart = self.WeaponEnt.SmokeParticles[self.WeaponEnt.DefaultHoldType or self.WeaponEnt.HoldType] or smokepart
@@ -13,6 +13,10 @@ function EFFECT:Init(data)
 
 	if self.WeaponEnt.SmokeParticles then
 		smokepart = self.WeaponEnt.SmokeParticles[self.WeaponEnt.DefaultHoldType or self.WeaponEnt.HoldType] or smokepart
+	end
+
+	if not smokepart or smokepart == "" or (TFA.HasParticleSystem and not TFA.HasParticleSystem(smokepart)) then
+		return
 	end
 
 	self.Position = self:GetTracerShootPos(data:GetOrigin(), self.WeaponEnt, self.Attachment)

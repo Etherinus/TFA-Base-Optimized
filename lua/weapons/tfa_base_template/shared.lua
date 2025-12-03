@@ -206,26 +206,7 @@ SWEP.SequenceLength = {} --This controls the length of a certain ACT_VM
 SWEP.SequenceLengthOverride = {} --Override this if you want to change the length of a sequence but not the next idle
 --[[EFFECTS]]--
 --Muzzle Smoke
-SWEP.SmokeParticles = {
-	pistol = "smoke_trail_controlled",  --These are particle effects INSIDE a pcf file, not PCF files, that are played when you shoot.
-	smg = "smoke_trail_tfa",
-	grenade = "smoke_trail_tfa",
-	ar2 = "smoke_trail_tfa",
-	shotgun = "smoke_trail_wild",
-	rpg = "smoke_trail_tfa",
-	physgun = "smoke_trail_tfa",
-	crossbow = "smoke_trail_tfa",
-	melee = "smoke_trail_tfa",
-	slam = "smoke_trail_tfa",
-	normal = "smoke_trail_tfa",
-	melee2 = "smoke_trail_tfa",
-	knife = "smoke_trail_tfa",
-	duel = "smoke_trail_tfa",
-	camera = "smoke_trail_tfa",
-	magic = "smoke_trail_tfa",
-	revolver = "smoke_trail_tfa",
-	silenced = "smoke_trail_controlled"
-}
+SWEP.SmokeParticles = {}
 SWEP.ShellAttachment			= "2" 		-- Should be "2" for CSS models or "shell" for hl2 models
 --Muzzle Flash
 SWEP.MuzzleAttachment			= "1" 		-- Should be "1" for CSS models or "muzzle" for hl2 models
