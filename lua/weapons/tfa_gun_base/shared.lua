@@ -13,6 +13,149 @@ SWEP.ViewModelFlip = false
 SWEP.Skin = 0 --Viewmodel skin
 SWEP.Spawnable = false
 SWEP.IsTFAWeapon = true
+SWEP.StatCache_Blacklist = SWEP.StatCache_Blacklist or {}
+SWEP.SightsPos = SWEP.SightsPos or Vector(0, 0, 0)
+SWEP.SightsAng = SWEP.SightsAng or Angle(0, 0, 0)
+SWEP.DTapActivities = SWEP.DTapActivities or {}
+SWEP.Animations = SWEP.Animations or {}
+
+local function tfaEnsureNW2(self)
+	self.SetNW2Bool = self.SetNW2Bool or self.SetNWBool
+	self.GetNW2Bool = self.GetNW2Bool or self.GetNWBool
+	self.SetNW2Int = self.SetNW2Int or self.SetNWInt
+	self.GetNW2Int = self.GetNW2Int or self.GetNWInt
+	self.SetNW2Float = self.SetNW2Float or self.SetNWFloat
+	self.GetNW2Float = self.GetNW2Float or self.GetNWFloat
+	self.SetNW2Entity = self.SetNW2Entity or self.SetNWEntity
+	self.GetNW2Entity = self.GetNW2Entity or self.GetNWEntity
+end
+
+local function tfaAddBaseFallbacks(swep)
+	if swep._TFA_BaseNWInitialized then return end
+	swep._TFA_BaseNWInitialized = true
+
+	swep.SetIronSightsRaw = swep.SetIronSightsRaw or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Bool("IronSightsRaw", val and true or false)
+	end
+
+	swep.GetIronSightsRaw = swep.GetIronSightsRaw or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Bool("IronSightsRaw", false)
+	end
+
+	swep.SetSprinting = swep.SetSprinting or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Bool("Sprinting", val and true or false)
+	end
+
+	swep.GetSprinting = swep.GetSprinting or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Bool("Sprinting", false)
+	end
+
+	swep.SetSilenced = swep.SetSilenced or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Bool("Silenced", val and true or false)
+	end
+
+	swep.GetSilenced = swep.GetSilenced or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Bool("Silenced", false)
+	end
+
+	swep.SetShotgunCancel = swep.SetShotgunCancel or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Bool("ShotgunCancel", val and true or false)
+	end
+
+	swep.GetShotgunCancel = swep.GetShotgunCancel or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Bool("ShotgunCancel", false)
+	end
+
+	swep.SetStatus = swep.SetStatus or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Int("Status", val or 0)
+	end
+
+	swep.GetStatus = swep.GetStatus or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Int("Status", (TFA and TFA.Enum and TFA.Enum.STATUS_IDLE) or 0)
+	end
+
+	swep.SetStatusEnd = swep.SetStatusEnd or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Float("StatusEnd", val or 0)
+	end
+
+	swep.GetStatusEnd = swep.GetStatusEnd or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Float("StatusEnd", 0)
+	end
+
+	swep.SetNextIdleAnim = swep.SetNextIdleAnim or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Float("NextIdleAnim", val or 0)
+	end
+
+	swep.GetNextIdleAnim = swep.GetNextIdleAnim or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Float("NextIdleAnim", 0)
+	end
+
+	swep.SetFireMode = swep.SetFireMode or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Int("FireMode", val or 0)
+	end
+
+	swep.GetFireMode = swep.GetFireMode or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Int("FireMode", 0)
+	end
+
+	swep.SetLastActivity = swep.SetLastActivity or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Int("LastActivity", val or 0)
+	end
+
+	swep.GetLastActivity = swep.GetLastActivity or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Int("LastActivity", 0)
+	end
+
+	swep.SetBurstCount = swep.SetBurstCount or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Int("BurstCount", val or 0)
+	end
+
+	swep.GetBurstCount = swep.GetBurstCount or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Int("BurstCount", 0)
+	end
+
+	swep.SetSwapTarget = swep.SetSwapTarget or function(self, val)
+		tfaEnsureNW2(self)
+		self:SetNW2Entity("SwapTarget", val)
+	end
+
+	swep.GetSwapTarget = swep.GetSwapTarget or function(self)
+		tfaEnsureNW2(self)
+		return self:GetNW2Entity("SwapTarget")
+	end
+end
+
+tfaAddBaseFallbacks(SWEP)
+
+function SWEP:GetAnimationRate()
+	return self.AnimationRate or 1
+end
+
+function SWEP:ScheduleStatus(status, len)
+	if not self.SetStatus or not self.SetStatusEnd then return end
+	self:SetStatus(status or 0)
+	self:SetStatusEnd(CurTime() + (len or 0))
+end
 
 SWEP.data = {}
 SWEP.data.ironsights = 1
@@ -396,6 +539,11 @@ sp = game.SinglePlayer()
 function SWEP:Initialize()
 	self.DrawCrosshairDefault = self.DrawCrosshair
 	self.HasInitialized = true
+	self.DTapActivities = self.DTapActivities or {}
+	self.Animations = self.Animations or {}
+	self.Primary_TFA = self.Primary_TFA or table.Copy(self.Primary or {})
+	self.Secondary_TFA = self.Secondary_TFA or table.Copy(self.Secondary or {})
+	self.GetIronSightsProgress = self.GetIronSightsProgress or self.GetIronSights
 	self.BobScaleCustom = 1
 	self.BobScale = 0
 	self.SwayScaleCustom = 1
@@ -657,6 +805,16 @@ function SWEP:Think2()
 	ct = l_ct()
 	stat = self:GetStatus()
 	statend = self:GetStatusEnd()
+
+	if stat == TFA.Enum.STATUS_SHOOTING and (not self.Owner or not self.Owner:KeyDown(IN_ATTACK)) and ct > self:GetNextPrimaryFire() then
+		stat = TFA.Enum.STATUS_IDLE
+		self:SetStatus(stat)
+		self:SetStatusEnd(ct)
+		self:SetNextIdleAnim(-1)
+		if self.ChooseIdleAnim then
+			self:ChooseIdleAnim()
+		end
+	end
 
 	if stat ~= TFA.Enum.STATUS_IDLE and ct > statend then
 		finalstat = TFA.Enum.STATUS_IDLE

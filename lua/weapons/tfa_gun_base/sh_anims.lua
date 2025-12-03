@@ -59,12 +59,14 @@ function SWEP:SendViewModelAnim(act, rate, targ, blend )
 end
 
 function SWEP:SendViewModelSeq(seq, rate, targ, blend )
+	if not self:VMIV() then return end
 	local vm = self.OwnerViewModel
+	if not IsValid(vm) then return end
+
 	if type(seq) == "string" then
 		seq = vm:LookupSequence(seq) or 0
 	end
 
-	if not self:VMIV() then return end
 	local act = vm:GetSequenceActivity(seq)
 	self:SetLastActivity( act )
 	if seq < 0 then

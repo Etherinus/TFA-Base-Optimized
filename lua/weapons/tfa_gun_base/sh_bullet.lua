@@ -66,7 +66,6 @@ function SWEP:ShootBullet(damage, recoil, num_bullets, aimcone, disablericochet,
 				ang:RotateAroundAxis(ang:Up(), -aimcone / 2 + math.Rand(0, aimcone))
 				dir = ang:Forward()
 				ent:SetPos(self.Owner:GetShootPos())
-				ent.Owner = self.Owner
 				ent:SetAngles(self.Owner:EyeAngles())
 				ent.damage = self.Primary.Damage
 				ent.mydamage = self.Primary.Damage
@@ -74,6 +73,9 @@ function SWEP:ShootBullet(damage, recoil, num_bullets, aimcone, disablericochet,
 				if self.ProjectileModel then
 					ent:SetModel(self.ProjectileModel)
 				end
+
+				ent:SetOwner(self.Owner)
+				ent.Owner = self.Owner
 
 				ent:Spawn()
 				ent:SetVelocity(dir * self.ProjectileVelocity)
@@ -86,9 +88,6 @@ function SWEP:ShootBullet(damage, recoil, num_bullets, aimcone, disablericochet,
 				if self.ProjectileModel then
 					ent:SetModel(self.ProjectileModel)
 				end
-
-				ent:SetOwner(self.Owner)
-				ent.Owner = self.Owner
 			end
 		end
 		-- Source

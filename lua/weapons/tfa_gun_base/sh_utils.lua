@@ -225,8 +225,8 @@ Purpose:  Utility
 ]]--
 function SWEP:IsSafety()
 	if not self.FireModes then return false end
-	local fm = self.FireModes[self:GetFireMode()]
-	local fmn = string.lower(fm and fm or self.FireModes[1])
+	local fm = self.FireModes[self:GetFireMode()] or self.FireModes[1]
+	local fmn = fm and string.lower(tostring(fm)) or ""
 
 	if fmn == "safe" or fmn == "holster" then
 		return true
@@ -370,7 +370,12 @@ end
 
 function SWEP:GetFireModeName()
 	local fm = self:GetFireMode()
-	local fmn = string.lower( self.FireModes[fm] )
+	local fireModeEntry = self.FireModes and self.FireModes[fm]
+	if not fireModeEntry then
+		return "Auto"
+	end
+
+	local fmn = string.lower( tostring(fireModeEntry) )
 	if fmn == "safe" or fmn == "holster" then return "Safety" end
 	if self.FireModeName then return self.FireModeName end
 	if fmn == "auto" or fmn == "automatic" then return "Full-Auto" end
@@ -403,17 +408,25 @@ end
 SWEP.BurstCountCache = {}
 
 function SWEP:GetMaxBurst()
-	local fm = self:GetFireMode()
-	if not self.BurstCountCache[ fm ] then
-		local fmn = string.lower( self.FireModes[fm] )
-		local bpos = string.find(fmn, "burst")
+	local fm = self:GetFireMode() or 1
+	local cacheKey = fm or 1
+
+	if not self.BurstCountCache[cacheKey] then
+		local fmEntry
+		if istable(self.FireModes) then
+			fmEntry = self.FireModes[fm] or self.FireModes[1]
+		end
+
+		local fmn = fmEntry and string.lower(tostring(fmEntry)) or nil
+		local bpos = fmn and string.find(fmn, "burst") or nil
 		if bpos then
-			self.BurstCountCache[ fm ] = tonumber( string.sub(fmn, 1, bpos - 1) )
+			self.BurstCountCache[cacheKey] = tonumber(string.sub(fmn, 1, bpos - 1)) or 1
 		else
-			self.BurstCountCache[ fm ] = 1
+			self.BurstCountCache[cacheKey] = 1
 		end
 	end
-	return self.BurstCountCache[ fm ]
+
+	return self.BurstCountCache[cacheKey]
 end
 
 --[[

@@ -79,17 +79,21 @@ function SWEP:ViewModelDrawn()
 		end
 	end
 
-	self:UpdateBonePositions(vm)
+	if self.UpdateBonePositions then
+		self:UpdateBonePositions(vm)
+	end
 
 	if not self.CameraAttachment then
 		self.CameraAttachment = -1
 
-		for _, v in ipairs(self.CameraAttachments) do
-			local attid = vm:LookupAttachment(v)
+		if istable(self.CameraAttachments) then
+			for _, v in ipairs(self.CameraAttachments) do
+				local attid = vm:LookupAttachment(v)
 
-			if attid and attid > 0 then
-				self.CameraAttachment = attid
-				break
+				if attid and attid > 0 then
+					self.CameraAttachment = attid
+					break
+				end
 			end
 		end
 	end
@@ -162,7 +166,7 @@ function SWEP:ViewModelDrawn()
 			end
 		end
 
-		for _, name in ipairs(self.vRenderOrder) do
+		for _, name in ipairs(self.vRenderOrder or {}) do
 			local v = self.VElements[name]
 			local aktiv = v.active
 			if aktiv ~= nil and aktiv == false then continue end

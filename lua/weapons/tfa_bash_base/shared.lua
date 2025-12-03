@@ -8,6 +8,7 @@ SWEP.Secondary.BashDelay = 0.2
 SWEP.Secondary.BashDamageType = DMG_SLASH
 SWEP.Secondary.BashEnd = nil --Override bash sequence length easier
 SWEP.BashBase = true
+SWEP.DTapActivities = SWEP.DTapActivities or {}
 
 --SWEP.tmptoggle = true
 function SWEP:BashForce(ent, force, pos, now)

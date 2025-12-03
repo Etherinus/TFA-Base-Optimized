@@ -7,6 +7,7 @@ SWEP.data = {}
 SWEP.data.ironsights = 0
 SWEP.Primary.Directional = false
 SWEP.Primary.Attacks = {}
+SWEP.DTapActivities = SWEP.DTapActivities or {}
 
 local l_CT = CurTime
 
