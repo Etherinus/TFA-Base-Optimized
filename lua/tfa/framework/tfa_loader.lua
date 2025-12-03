@@ -1,53 +1,73 @@
 if SERVER then AddCSLuaFile() end
 
 TFA = TFA or {}
+TFA.Enum = TFA.Enum or {}
 
-local do_load = true
+local fileFind = file.Find
+local includeFn = include
+local addCSLuaFile = AddCSLuaFile
+local debugGetInfo = debug.getinfo
+local printFn = print
+local typeFn = type
+local ipairs = ipairs
+local stringFind = string.find
+
+local doLoad = true
 local version = 4.034
-local version_string = "4.0.3.4 SV"
-local changelog = [[Server Final Edition]]
+local versionString = "4.0.3.4 SV"
+local changelog = "Server Final Edition"
 
-local function testFunc() end
-local my_path = debug.getinfo(testFunc)
-my_path = (my_path and type(my_path) == "table" and my_path.short_src) and my_path.short_src or "legacy"
+local function marker() end
+local info = debugGetInfo(marker)
+local myPath = "legacy"
+
+if info and typeFn(info) == "table" and info.short_src then
+    myPath = info.short_src
+end
 
 if TFA_BASE_VERSION then
+    local existingPath = TFA_FILE_PATH or ""
+
     if TFA_BASE_VERSION > version then
-        print("You have a newer, conflicting version of TFA Base located at: " .. (TFA_FILE_PATH or ""))
-        do_load = false
+        printFn("TFA Base - newer conflicting version detected at: " .. existingPath)
+        doLoad = false
     elseif TFA_BASE_VERSION < version then
-        print("You have an older, conflicting version of TFA Base located at: " .. (TFA_FILE_PATH or ""))
+        printFn("TFA Base - older conflicting version detected at: " .. existingPath)
     else
-        print("You have an equal, conflicting version of TFA Base located at: " .. (TFA_FILE_PATH or ""))
+        printFn("TFA Base - equal conflicting version detected at: " .. existingPath)
     end
 end
 
-if do_load then
-    TFA_BASE_VERSION = version
-    TFA_BASE_VERSION_STRING = version_string
-    TFA_BASE_VERSION_CHANGES = changelog
-    TFA_ATTACHMENTS_ENABLED = false
-    TFA_FILE_PATH = my_path
+if not doLoad then
+    return
+end
 
-    TFA.Enum = TFA.Enum or {}
+TFA_BASE_VERSION = version
+TFA_BASE_VERSION_STRING = versionString
+TFA_BASE_VERSION_CHANGES = changelog
+TFA_ATTACHMENTS_ENABLED = false
+TFA_FILE_PATH = myPath
 
-    local function LoadFolder(folder)
-        local flist = file.Find("tfa/" .. folder .. "/*.lua", "LUA")
-        for _, filename in ipairs(flist) do
-            local isClient = filename:find("cl_")
-            local isServer = filename:find("sv_")
+local function loadFolder(folder)
+    local basePath = "tfa/" .. folder .. "/"
+    local flist = fileFind(basePath .. "*.lua", "LUA")
 
-            if SERVER and not isServer then
-                AddCSLuaFile("tfa/" .. folder .. "/" .. filename)
-            end
+    for i = 1, #flist do
+        local filename = flist[i]
+        local isClient = stringFind(filename, "cl_", 1, true) ~= nil
+        local isServer = stringFind(filename, "sv_", 1, true) ~= nil
+        local fullPath = basePath .. filename
 
-            if (SERVER and not isClient) or (CLIENT and not isServer) then
-                include("tfa/" .. folder .. "/" .. filename)
-            end
+        if SERVER and not isServer then
+            addCSLuaFile(fullPath)
+        end
+
+        if (SERVER and not isClient) or (CLIENT and not isServer) then
+            includeFn(fullPath)
         end
     end
-
-    LoadFolder("enums")
-    LoadFolder("modules")
-    LoadFolder("external")
 end
+
+loadFolder("enums")
+loadFolder("modules")
+loadFolder("external")

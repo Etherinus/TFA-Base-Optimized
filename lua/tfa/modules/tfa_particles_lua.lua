@@ -1,10 +1,23 @@
 TFAFlareParts = TFAFlareParts or {}
 TFAVMAttachments = TFAVMAttachments or {}
 
-local ply, vm, wep
+local ply
+local vm
+local wep
 
 if CLIENT then
-    hook.Add("PostDrawViewModel", "TFAMuzzleUpdate", function(vmod, plyv)
+    local hook_Add = hook.Add
+    local pairs = pairs
+    local IsValid = IsValid
+    local WorldToLocal = WorldToLocal
+    local LocalToWorld = LocalToWorld
+    local FrameTime = FrameTime
+    local vector_origin = vector_origin
+    local table_insert = table.insert
+    local table_RemoveByValue = table.RemoveByValue
+    local timer_Simple = timer.Simple
+
+    hook_Add("PostDrawViewModel", "TFAMuzzleUpdate", function(vmod, plyv)
         vm = vmod
         ply = plyv
 
@@ -20,7 +33,10 @@ if CLIENT then
     end)
 
     function TFARegPartThink(particle, partfunc)
-        if not particle or not partfunc then return end
+        if not particle or not partfunc then
+            return
+        end
+
         particle.ThinkFunc = partfunc
 
         if IsValid(particle.FollowEnt) and particle.Att then
@@ -30,11 +46,11 @@ if CLIENT then
             end
         end
 
-        table.insert(TFAFlareParts, particle)
+        table_insert(TFAFlareParts, particle)
 
-        timer.Simple(particle:GetDieTime(), function()
+        timer_Simple(particle:GetDieTime(), function()
             if particle then
-                table.RemoveByValue(TFAFlareParts, particle)
+                table_RemoveByValue(TFAFlareParts, particle)
             end
         end)
     end
@@ -45,13 +61,20 @@ if CLIENT then
             first = true
         end
 
-        if not IsValid(ply) or not IsValid(vm) then return end
+        if not IsValid(ply) or not IsValid(vm) then
+            return
+        end
+
         wep = ply:GetActiveWeapon()
-        if IsValid(wep) and wep.IsCurrentlyScoped and wep:IsCurrentlyScoped() then return end
+        if IsValid(wep) and wep.IsCurrentlyScoped and wep:IsCurrentlyScoped() then
+            return
+        end
 
         if IsValid(self.FollowEnt) then
             local owent = self.FollowEnt.Owner or self.FollowEnt
-            if not IsValid(owent) then return end
+            if not IsValid(owent) then
+                return
+            end
 
             local firvel = vector_origin
             if first then
@@ -60,6 +83,7 @@ if CLIENT then
 
             if self.Att and self.OffPos then
                 local angpos
+
                 if self.FollowEnt == vm then
                     angpos = TFAVMAttachments[self.Att]
                 else

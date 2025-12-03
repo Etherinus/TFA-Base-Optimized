@@ -1,5 +1,8 @@
 if not matproxy then return end
 
+local IsValid = IsValid
+local isvector = isvector
+
 matproxy.Add({
     name = "PlayerWeaponColorStatic",
 
@@ -8,13 +11,19 @@ matproxy.Add({
     end,
 
     bind = function(self, mat, ent)
-        if not IsValid(ent) then return end
+        if not IsValid(ent) then
+            return
+        end
 
         local owner = ent:GetOwner()
-        if not IsValid(owner) or not owner:IsPlayer() then return end
+        if not IsValid(owner) or not owner:IsPlayer() then
+            return
+        end
 
         local col = owner:GetWeaponColor()
-        if not isvector(col) then return end
+        if not isvector(col) then
+            return
+        end
 
         mat:SetVector(self.ResultTo, col)
     end

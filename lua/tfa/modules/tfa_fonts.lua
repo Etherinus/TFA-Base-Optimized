@@ -1,4 +1,7 @@
 if CLIENT and not TFASleekFontCreated then
+    local surface_CreateFont = surface.CreateFont
+    local draw_GetFontHeight = draw.GetFontHeight
+
     local fontdata = {
         font = "Roboto-Regular",
         size = 36,
@@ -6,20 +9,20 @@ if CLIENT and not TFASleekFontCreated then
         shadow = false
     }
 
-    surface.CreateFont("TFASleek", fontdata)
+    surface_CreateFont("TFASleek", fontdata)
 
     fontdata.size = 30
-    surface.CreateFont("TFASleekMedium", fontdata)
+    surface_CreateFont("TFASleekMedium", fontdata)
 
     fontdata.size = 24
-    surface.CreateFont("TFASleekSmall", fontdata)
+    surface_CreateFont("TFASleekSmall", fontdata)
 
     fontdata.size = 18
-    surface.CreateFont("TFASleekTiny", fontdata)
+    surface_CreateFont("TFASleekTiny", fontdata)
 
     TFASleekFontCreated = true
-    TFASleekFontHeight = draw.GetFontHeight("TFASleek")
-    TFASleekFontHeightMedium = draw.GetFontHeight("TFASleekMedium")
-    TFASleekFontHeightSmall = draw.GetFontHeight("TFASleekSmall")
-    TFASleekFontHeightTiny = draw.GetFontHeight("TFASleekTiny")
+    TFASleekFontHeight = draw_GetFontHeight("TFASleek")
+    TFASleekFontHeightMedium = draw_GetFontHeight("TFASleekMedium")
+    TFASleekFontHeightSmall = draw_GetFontHeight("TFASleekSmall")
+    TFASleekFontHeightTiny = draw_GetFontHeight("TFASleekTiny")
 end

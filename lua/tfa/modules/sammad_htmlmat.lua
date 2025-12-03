@@ -2,52 +2,55 @@ if SERVER then AddCSLuaFile() end
 
 local ipairs = ipairs
 local pairs = pairs
-local table = table
-local timer = timer
+local table_insert = table.insert
+local table_remove = table.remove
+local table_concat = table.concat
+local table_Merge = table.Merge
+local table_Copy = table.Copy
+local timer_Create = timer.Create
+local timer_Remove = timer.Remove
 local ceil = math.ceil
 local log = math.log
 local pow = math.pow
-local string = string
+local string_Replace = string.Replace
 local Material = Material
 local type = type
 
-local function dosomething()
-end
-
 local HTML_MATERIALS_ENABLED = false
-local fallback_mat = Material("vgui/white")
-local fallback_mat_token = "!" .. fallback_mat:GetName()
+local fallbackMat = Material("vgui/white")
+local fallbackMatToken = "!" .. fallbackMat:GetName()
 
 function GetHTMLMaterialVL(url, callbackfunc)
-    if not CLIENT then return end
+    if not CLIENT then
+        return
+    end
+
     if not HTML_MATERIALS_ENABLED then
         if callbackfunc then
-            callbackfunc(fallback_mat_token)
+            callbackfunc(fallbackMatToken)
         end
+
         return
     end
 
     HTMLMaterial(url, HTMLMAT_STYLE_COVER_IMG, function(mat)
         local matdata = {
-            ["$basetexture"]          = mat:GetName(),
-            ["$bumpmap"]              = "null-bumpmap",
+            ["$basetexture"] = mat:GetName(),
+            ["$bumpmap"] = "null-bumpmap",
             ["$phongexponenttexture"] = "models/exp_gun",
-            ["$model"]                = 1,
-            ["$phong"]                = 1,
-            ["$phongboost"]           = 1,
-            ["$phongalbedoboost"]     = 35,
-            ["$phongfresnelranges"]   = "[.83 .83 1]",
-            ["$phongalbedotint"]      = 1,
-            ["$envmap"]               = "env_cubemap",
-            ["$envmaptint"]           = "[0.05 0.05 0.05]",
-            ["$envmapfresnel"]        = 1
+            ["$model"] = 1,
+            ["$phong"] = 1,
+            ["$phongboost"] = 1,
+            ["$phongalbedoboost"] = 35,
+            ["$phongfresnelranges"] = "[.83 .83 1]",
+            ["$phongalbedotint"] = 1,
+            ["$envmap"] = "env_cubemap",
+            ["$envmaptint"] = "[0.05 0.05 0.05]",
+            ["$envmapfresnel"] = 1
         }
 
-        local uid = string.Replace(mat:GetName(), "__vgui_texture_", "")
+        local uid = string_Replace(mat:GetName(), "__vgui_texture_", "")
         local vertexmat = CreateMaterial("WebMaterial_" .. uid, "VertexLitGeneric", matdata)
-        if vertexmat then
-            dosomething()
-        end
 
         if callbackfunc then
             callbackfunc("!" .. "WebMaterial_" .. uid)
@@ -109,13 +112,14 @@ local function updateCache(download)
 end
 
 local function updateMaterials()
-    for _, download in ipairs(downloads) do
-        updateCache(download)
+    for i = 1, #downloads do
+        updateCache(downloads[i])
     end
 end
 
 local function onImageLoaded(key, browser)
     local idx
+
     for i, v in pairs(downloads) do
         if v.key == key then
             idx = i
@@ -125,11 +129,11 @@ local function onImageLoaded(key, browser)
 
     if idx then
         browserpool.release(browser, true)
-        table.remove(downloads, idx)
+        table_remove(downloads, idx)
     end
 
     if #downloads == 0 and TimerRunning then
-        timer.Remove(UpdateTimerName)
+        timer_Remove(UpdateTimerName)
         TimerRunning = false
     end
 end
@@ -139,7 +143,9 @@ local function enqueueUrl(url, styleName, key, callback)
         if type(callback) == "function" then
             callback(DefaultMat)
         end
+
         cache[key] = DefaultMat
+
         return
     end
 
@@ -149,6 +155,7 @@ local function enqueueUrl(url, styleName, key, callback)
         local style = styles[styleName] or DefaultStyle
         local w = style.width or DefaultWidth
         local h = style.height or w
+
         browser:SetSize(w, h)
 
         local download = {
@@ -156,22 +163,24 @@ local function enqueueUrl(url, styleName, key, callback)
             key = key,
             browser = browser
         }
-        table.insert(downloads, download)
+
+        table_insert(downloads, download)
 
         browser:AddFunction("gmod", "imageLoaded", function()
             updateCache(download)
             onImageLoaded(key, browser)
+
             if type(callback) == "function" then
                 callback(cache[key])
             end
         end)
 
         if not TimerRunning then
-            timer.Create(UpdateTimerName, 0.05, 0, updateMaterials)
+            timer_Create(UpdateTimerName, 0.05, 0, updateMaterials)
             TimerRunning = true
         end
 
-        local html = (style.html or embedHtml):format(url, style.css or '')
+        local html = (style.html or embedHtml):format(url, style.css or "")
         browser:SetHTML(html)
     end)
 end
@@ -179,11 +188,15 @@ end
 local MAT_STR_TABLE = {"", "@", ""}
 
 function HTMLMaterial(url, style, callback)
-    if not url then return DefaultMat end
+    if not url then
+        return DefaultMat
+    end
+
     if not HTML_MATERIALS_ENABLED then
         if type(callback) == "function" then
             callback(DefaultMat)
         end
+
         return DefaultMat
     end
 
@@ -192,7 +205,7 @@ function HTMLMaterial(url, style, callback)
     if style then
         MAT_STR_TABLE[1] = url
         MAT_STR_TABLE[3] = style
-        key = table.concat(MAT_STR_TABLE)
+        key = table_concat(MAT_STR_TABLE)
     else
         key = url
     end
@@ -235,55 +248,74 @@ end
 
 function AddHTMLMaterialStyle(name, params, base)
     params = params or {}
+
     if base then
-        table.Merge(params, table.Copy(styles[base] or {}))
+        table_Merge(params, table_Copy(styles[base] or {}))
     end
+
     styles[name] = params
 end
 
-HTMLMAT_STYLE_BLUR       = "htmlmat.style.blur"
-HTMLMAT_STYLE_GRAYSCALE  = "htmlmat.style.grayscale"
-HTMLMAT_STYLE_SEPIA      = "htmlmat.style.sepia"
-HTMLMAT_STYLE_INVERT     = "htmlmat.style.invert"
-HTMLMAT_STYLE_CIRCLE     = "htmlmat.style.circle"
-HTMLMAT_STYLE_COVER      = "htmlmat.style.cover"
-HTMLMAT_STYLE_COVER_IMG  = "htmlmat.style.coverimg"
+HTMLMAT_STYLE_BLUR = "htmlmat.style.blur"
+HTMLMAT_STYLE_GRAYSCALE = "htmlmat.style.grayscale"
+HTMLMAT_STYLE_SEPIA = "htmlmat.style.sepia"
+HTMLMAT_STYLE_INVERT = "htmlmat.style.invert"
+HTMLMAT_STYLE_CIRCLE = "htmlmat.style.circle"
+HTMLMAT_STYLE_COVER = "htmlmat.style.cover"
+HTMLMAT_STYLE_COVER_IMG = "htmlmat.style.coverimg"
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_BLUR, {
-    css = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_BLUR,
+    {
+        css = [[
         img {
             -webkit-filter: blur(8px);
             -webkit-transform: scale(1.1, 1.1);
         }
     ]]
-})
+    }
+)
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_GRAYSCALE, {
-    css = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_GRAYSCALE,
+    {
+        css = [[
         img { -webkit-filter: grayscale(1); }
     ]]
-})
+    }
+)
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_SEPIA, {
-    css = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_SEPIA,
+    {
+        css = [[
         img { -webkit-filter: sepia(1); }
     ]]
-})
+    }
+)
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_INVERT, {
-    css = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_INVERT,
+    {
+        css = [[
         img { -webkit-filter: invert(1); }
     ]]
-})
+    }
+)
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_CIRCLE, {
-    css = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_CIRCLE,
+    {
+        css = [[
         img { border-radius: 50%; }
     ]]
-})
+    }
+)
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_COVER, {
-    html = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_COVER,
+    {
+        html = [[
         <script>var src = '%s';</script>
         <style type="text/css">
             html, body {
@@ -315,10 +347,13 @@ AddHTMLMaterialStyle(HTMLMAT_STYLE_COVER, {
             img.src = src;
         </script>
     ]]
-})
+    }
+)
 
-AddHTMLMaterialStyle(HTMLMAT_STYLE_COVER_IMG, {
-    html = [[
+AddHTMLMaterialStyle(
+    HTMLMAT_STYLE_COVER_IMG,
+    {
+        html = [[
         <script>var src = '%s';</script>
         <style type="text/css">
             html, body {
@@ -357,4 +392,5 @@ AddHTMLMaterialStyle(HTMLMAT_STYLE_COVER_IMG, {
             mat.src = src;
         </script>
     ]]
-})
+    }
+)

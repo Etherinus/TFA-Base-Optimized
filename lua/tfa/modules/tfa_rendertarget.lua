@@ -2,7 +2,9 @@ local onevec = Vector(1, 1, 1)
 
 local function RBP(vm)
     local bc = vm:GetBoneCount()
-    if not bc or bc <= 0 then return end
+    if not bc or bc <= 0 then
+        return
+    end
 
     for i = 0, bc - 1 do
         vm:ManipulateBoneScale(i, onevec)
@@ -12,6 +14,18 @@ local function RBP(vm)
 end
 
 if CLIENT then
+    local CreateMaterial = CreateMaterial
+    local GetRenderTarget = GetRenderTarget
+    local ScrW = ScrW
+    local ScrH = ScrH
+    local GetViewEntity = GetViewEntity
+    local LocalPlayer = LocalPlayer
+    local IsValid = IsValid
+    local hook_Add = hook.Add
+    local render_PushRenderTarget = render.PushRenderTarget
+    local render_Clear = render.Clear
+    local render_PopRenderTarget = render.PopRenderTarget
+
     local props = {
         ["$translucent"] = 1
     }
@@ -19,9 +33,11 @@ if CLIENT then
     local TFA_RTMat = CreateMaterial("tfa_rtmaterial", "UnLitGeneric", props)
     local TFA_RTScreen = GetRenderTarget("TFA_RT_Screen", 512, 512)
     local oldVmModel = ""
-    local oldWep = nil
+    local oldWep
 
-    local ply, vm, wep
+    local ply
+    local vm
+    local wep
 
     function TFARefreshRT()
         if not TFA_RTScreen then
@@ -36,6 +52,7 @@ if CLIENT then
                 TFA_RTScreen = GetRenderTarget("TFA_RT_Screen" .. CurTime(), 256, 256)
                 print("warning: tfa rt re-patched to 256")
             end
+
             print("warning: tfa rt re-patched")
         end
     end
@@ -43,7 +60,10 @@ if CLIENT then
     TFA_RENDERSCREEN = false
 
     local function TFARenderScreen()
-        if TFA_RENDERSCREEN then return end
+        if TFA_RENDERSCREEN then
+            return
+        end
+
         TFA_RENDERSCREEN = true
 
         ply = GetViewEntity()
@@ -60,16 +80,16 @@ if CLIENT then
         end
 
         wep = ply:GetActiveWeapon()
-
         if not (IsValid(wep) and wep.IsTFAWeapon) then
             TFA_RENDERSCREEN = false
             return
         end
 
-        if oldVmModel ~= vm:GetModel() or (wep ~= oldWep) then
+        if oldVmModel ~= vm:GetModel() or wep ~= oldWep then
             if IsValid(oldWep) then
                 oldWep.MaterialCached = nil
             end
+
             oldWep = wep
             RBP(vm)
             vm:SetSubMaterial()
@@ -92,6 +112,7 @@ if CLIENT then
 
         if wep.MaterialTable and not wep.MaterialCached then
             wep.MaterialCached = {}
+
             if #wep.MaterialTable >= 1 and #wep:GetMaterials() <= 1 then
                 wep:SetMaterial(wep.MaterialTable[1])
             else
@@ -117,12 +138,13 @@ if CLIENT then
         TFARefreshRT()
         oldVmModel = vm:GetModel()
 
-        local scw, sch = ScrW(), ScrH()
+        local scw = ScrW()
+        local sch = ScrH()
 
-        render.PushRenderTarget(TFA_RTScreen)
-        render.Clear(0, 0, 0, 0, true, true)
+        render_PushRenderTarget(TFA_RTScreen)
+        render_Clear(0, 0, 0, 0, true, true)
         wep:RTCode(TFA_RTMat, scw, sch)
-        render.PopRenderTarget()
+        render_PopRenderTarget()
 
         TFA_RTMat:SetTexture("$basetexture", TFA_RTScreen)
         wep.Owner:GetViewModel():SetSubMaterial(wep.RTMaterialOverride, "!tfa_rtmaterial")
@@ -130,5 +152,5 @@ if CLIENT then
         TFA_RENDERSCREEN = false
     end
 
-    hook.Add("RenderScene", "TFASCREENS", TFARenderScreen)
+    hook_Add("RenderScene", "TFASCREENS", TFARenderScreen)
 end

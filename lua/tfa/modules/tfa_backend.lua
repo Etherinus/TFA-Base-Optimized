@@ -1,3 +1,5 @@
+TFA = TFA or {}
+
 local string = string
 local math = math
 local table = table
@@ -7,9 +9,11 @@ local hook = hook
 local CurTime = CurTime
 local IsValid = IsValid
 local LocalPlayer = LocalPlayer
+local type = type
 
 hook.Add("HUDPaint", "TFA_TRIGGERCLIENTLOAD", function()
-    if IsValid(LocalPlayer()) then
+    local lp = LocalPlayer()
+    if IsValid(lp) then
         hook.Call("TFA_ClientLoad")
         hook.Remove("HUDPaint", "TFA_TRIGGERCLIENTLOAD")
     end

@@ -1,28 +1,31 @@
+if not CLIENT then return end
+
+local GetConVar = GetConVar
+local ScrW = ScrW
+local ScrH = ScrH
+local LocalPlayer = LocalPlayer
+local IsValid = IsValid
+
+local surface_SetDrawColor = surface.SetDrawColor
+local surface_DrawRect = surface.DrawRect
+local color_white = color_white
+
 local cv_dbc
-local w, h
-local lply
 
 hook.Add("HUDPaint", "tfa_debugcrosshair", function()
-    if not cv_dbc then
-        cv_dbc = GetConVar("cl_tfa_debugcrosshair")
+    cv_dbc = cv_dbc or GetConVar("cl_tfa_debugcrosshair")
+    if not cv_dbc or not cv_dbc:GetBool() then
+        return
     end
 
-    if not cv_dbc or not cv_dbc:GetBool() then return end
-
-    if not w then
-        w = ScrW()
+    local lp = LocalPlayer()
+    if not IsValid(lp) or not lp:IsAdmin() then
+        return
     end
 
-    if not h then
-        h = ScrH()
-    end
+    local w = ScrW()
+    local h = ScrH()
 
-    if not IsValid(lply) then
-        lply = LocalPlayer()
-    end
-
-    if not IsValid(lply) or not lply:IsAdmin() then return end
-
-    surface.SetDrawColor(color_white)
-    surface.DrawRect(w / 2 - 1, h / 2 - 1, 2, 2)
+    surface_SetDrawColor(color_white)
+    surface_DrawRect(w * 0.5 - 1, h * 0.5 - 1, 2, 2)
 end)

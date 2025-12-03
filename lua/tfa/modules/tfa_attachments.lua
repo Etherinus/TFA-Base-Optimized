@@ -1,15 +1,16 @@
+TFA = TFA or {}
 TFA.Attachments = TFA.Attachments or {}
-TFA.Attachments.Atts = {}
+TFA.Attachments.Atts = TFA.Attachments.Atts or {}
 
 TFA.Attachments.Colors = {
-    ["active"]      = Color(252, 151, 50, 255),
-    ["error"]       = Color(225, 0, 0, 255),
-    ["background"]  = Color(15, 15, 15, 64),
-    ["primary"]     = Color(245, 245, 245, 255),
-    ["secondary"]   = Color(153, 253, 220, 255),
-    ["+"]           = Color(128, 255, 128, 255),
-    ["-"]           = Color(255, 128, 128, 255),
-    ["="]           = Color(192, 192, 192, 255)
+    active = Color(252, 151, 50, 255),
+    error = Color(225, 0, 0, 255),
+    background = Color(15, 15, 15, 64),
+    primary = Color(245, 245, 245, 255),
+    secondary = Color(153, 253, 220, 255),
+    ["+"] = Color(128, 255, 128, 255),
+    ["-"] = Color(255, 128, 128, 255),
+    ["="] = Color(192, 192, 192, 255)
 }
 
 TFA.Attachments.UIPadding = 2
@@ -19,19 +20,25 @@ TFA_ATTACHMENT_ISUPDATING = false
 
 local pairs = pairs
 local ipairs = ipairs
-local string = string
-local table = table
+local string_find = string.find
+local string_Replace = string.Replace
+local table_insert = table.insert
 local include = include
 local setmetatable = setmetatable
-local file = file
+local file_Find = file.Find
+local istable = istable
+local rawget = rawget
 local SERVER = SERVER
 local CLIENT = CLIENT
 local pcall = pcall
-local hook = hook
+local hook_Run = hook.Run
 local ProtectedCall = ProtectedCall or pcall
 
 local function basefunc(t, k)
-    if k == "Base" then return end
+    if k == "Base" then
+        return
+    end
+
     if t.Base then
         local bt = TFA.Attachments.Atts[t.Base]
         if bt then
@@ -45,13 +52,16 @@ local inheritanceCached = {}
 local function patchInheritance(tbl, basetbl)
     if not basetbl and tbl.Base then
         basetbl = TFA.Attachments.Atts[tbl.Base]
+
         if basetbl and istable(basetbl) and basetbl.ID and not inheritanceCached[basetbl.ID] then
             inheritanceCached[basetbl.ID] = true
             patchInheritance(basetbl)
         end
     end
 
-    if not (basetbl and istable(basetbl)) then return end
+    if not (basetbl and istable(basetbl)) then
+        return
+    end
 
     for k, v in pairs(tbl) do
         local baseValue = basetbl[k]
@@ -81,12 +91,12 @@ function TFAUpdateAttachments()
 
     TFA_ATTACHMENT_ISUPDATING = true
 
-    local baseFiles = file.Find(TFA.Attachments.Path .. "*base*", "LUA", "namedesc")
-    local addFiles = file.Find(TFA.Attachments.Path .. "*", "LUA", "namedesc")
+    local baseFiles = file_Find(TFA.Attachments.Path .. "*base*", "LUA", "namedesc")
+    local addFiles = file_Find(TFA.Attachments.Path .. "*", "LUA", "namedesc")
 
     for _, v in ipairs(addFiles) do
-        if not string.find(v, "base") then
-            table.insert(baseFiles, v)
+        if not string_find(v, "base", 1, true) then
+            table_insert(baseFiles, v)
         end
     end
 
@@ -95,16 +105,15 @@ function TFAUpdateAttachments()
         local filepath = TFA.Attachments.Path .. v
 
         ATTACHMENT = {}
-        ATTACHMENT.ID = string.Replace(id, ".lua", "")
+        ATTACHMENT.ID = string_Replace(id, ".lua", "")
 
         if SERVER then
             AddCSLuaFile(filepath)
-            include(filepath)
-        else
-            include(filepath)
         end
 
-        setmetatable(ATTACHMENT, {__index = basefunc})
+        include(filepath)
+
+        setmetatable(ATTACHMENT, { __index = basefunc })
         TFARegisterAttachment(ATTACHMENT)
 
         ATTACHMENT = nil
@@ -115,7 +124,7 @@ function TFAUpdateAttachments()
     end
 
     ProtectedCall(function()
-        hook.Run("TFAAttachmentsLoaded")
+        hook_Run("TFAAttachmentsLoaded")
     end)
 
     TFA_ATTACHMENT_ISUPDATING = false

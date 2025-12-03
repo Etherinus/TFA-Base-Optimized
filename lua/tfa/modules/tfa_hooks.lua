@@ -1,22 +1,32 @@
-local ply, wep
+local LocalPlayer = LocalPlayer
+local IsValid = IsValid
+local CurTime = CurTime
+local GetConVar = GetConVar
+local net_Start = net.Start
+local net_SendToServer = net.SendToServer
+local timer_Simple = timer.Simple
+local Lerp = Lerp
+
+local cachedPly
+local cachedWep
 
 hook.Add("PlayerTick", "PlayerTickTFA", function(plyv)
-    wep = plyv:GetActiveWeapon()
+    local wep = plyv:GetActiveWeapon()
     if IsValid(wep) and wep.PlayerThink then
         wep:PlayerThink(plyv)
     end
 end)
 
 hook.Add("PreRender", "prerender_tfabase", function()
-    if not IsValid(ply) then
-        ply = LocalPlayer()
+    if not IsValid(cachedPly) then
+        cachedPly = LocalPlayer()
         return
     end
 
-    wep = ply:GetActiveWeapon() or wep
+    cachedWep = cachedPly:GetActiveWeapon() or cachedWep
 
-    if IsValid(wep) and wep.IsTFAWeapon and wep.PlayerThinkCL then
-        wep:PlayerThinkCL(ply)
+    if IsValid(cachedWep) and cachedWep.IsTFAWeapon and cachedWep.PlayerThinkCL then
+        cachedWep:PlayerThinkCL(cachedPly)
     end
 end)
 
@@ -31,20 +41,26 @@ if CLIENT then
     cv_cci = GetConVar("cl_tfa_inspection_ckey")
 end
 
-local function TFAPlayerBindPress(plyv, b, p)
-    if p and IsValid(plyv) then
-        wep = plyv:GetActiveWeapon() or wep
-        if IsValid(wep) then
-            if wep.ToggleInspect and b == "+menu_context" and cv_cm:GetBool() then
-                if not cv_cci or not cv_cci:GetBool() then
-                    wep:ToggleInspect()
-                elseif wep.CheckAmmo then
-                    net.Start("tfaRequestFidget")
-                    net.SendToServer()
-                end
-                return true
-            end
+local function TFAPlayerBindPress(plyv, bind, pressed)
+    if not pressed or not IsValid(plyv) then
+        return
+    end
+
+    local wep = plyv:GetActiveWeapon() or cachedWep
+
+    if not IsValid(wep) then
+        return
+    end
+
+    if wep.ToggleInspect and bind == "+menu_context" and cv_cm:GetBool() then
+        if not cv_cci or not cv_cci:GetBool() then
+            wep:ToggleInspect()
+        elseif wep.CheckAmmo then
+            net_Start("tfaRequestFidget")
+            net_SendToServer()
         end
+
+        return true
     end
 end
 
@@ -54,7 +70,7 @@ local cv_lr = GetConVar("sv_tfa_reloads_legacy")
 
 local function KP_Bash(plyv, key)
     if key == IN_ZOOM then
-        wep = plyv:GetActiveWeapon()
+        local wep = plyv:GetActiveWeapon()
         if IsValid(wep) and wep.AltAttack then
             wep:AltAttack()
         end
@@ -71,15 +87,17 @@ hook.Add("KeyPress", "TFABase_KP", KP_Bash)
 local reload_threshold = 0.3
 
 local function KR_Reload(plyv, key)
-    if key == IN_RELOAD and cv_lr and (not cv_lr:GetBool()) then
-        if CurTime() <= (plyv.LastReloadPressed or 0) + reload_threshold then
-            plyv.LastReloadPressed = nil
-            plyv.HasTFAAmmoChek = false
-            wep = plyv:GetActiveWeapon()
+    if key ~= IN_RELOAD or not cv_lr or cv_lr:GetBool() then
+        return
+    end
 
-            if IsValid(wep) and wep.IsTFAWeapon then
-                wep:Reload(true)
-            end
+    if CurTime() <= (plyv.LastReloadPressed or 0) + reload_threshold then
+        plyv.LastReloadPressed = nil
+        plyv.HasTFAAmmoChek = false
+
+        local wep = plyv:GetActiveWeapon()
+        if IsValid(wep) and wep.IsTFAWeapon then
+            wep:Reload(true)
         end
     end
 end
@@ -87,9 +105,12 @@ end
 hook.Add("KeyRelease", "TFABase_KR", KR_Reload)
 
 local function KD_AmmoCheck(plyv)
-    if plyv.HasTFAAmmoChek then return end
+    if plyv.HasTFAAmmoChek then
+        return
+    end
+
     if plyv:KeyDown(IN_RELOAD) and CurTime() > (plyv.LastReloadPressed or 0) + reload_threshold then
-        wep = plyv:GetActiveWeapon()
+        local wep = plyv:GetActiveWeapon()
         if IsValid(wep) and wep.IsTFAWeapon then
             plyv.HasTFAAmmoChek = true
             wep:CheckAmmo()
@@ -104,6 +125,7 @@ function TFA.ProcessBashZoom(plyv, wepv)
         plyv:SetCanZoom(true)
         return
     end
+
     if wepv.AltAttack then
         plyv:SetCanZoom(false)
     else
@@ -111,8 +133,8 @@ function TFA.ProcessBashZoom(plyv, wepv)
     end
 end
 
-local function PSW_PBZ(plyv, owv, nwv)
-    timer.Simple(0, function()
+local function PSW_PBZ(plyv)
+    timer_Simple(0, function()
         if IsValid(plyv) then
             TFA.ProcessBashZoom(plyv, plyv:GetActiveWeapon())
         end
@@ -129,7 +151,8 @@ hook.Add("PlayerSpawn", "TFAExtinguishQOL", function(plyv)
 end)
 
 local cv_cmove = GetConVar("sv_tfa_compat_movement")
-local sumwep, speedmult
+local sumwep
+local speedmult
 
 if not Clockwork then
     hook.Add("SetupMove", "tfa_setupmove", function(plyv, movedata, commanddata)
@@ -139,9 +162,11 @@ if not Clockwork then
             return
         end
 
-        sumwep = plyv:GetActiveWeapon() or wep
+        sumwep = plyv:GetActiveWeapon() or cachedWep
+
         if IsValid(sumwep) and sumwep.IsTFAWeapon then
             sumwep.IronSightsProgress = sumwep.IronSightsProgress or 0
+
             speedmult = Lerp(sumwep.IronSightsProgress, sumwep.MoveSpeed or 1, sumwep.IronSightsMoveSpeed or 1)
 
             movedata:SetMaxClientSpeed(movedata:GetMaxClientSpeed() * speedmult)
@@ -161,16 +186,18 @@ end)
 if CLIENT then
     local cv_he = GetConVar("cl_tfa_hud_enabled", 1)
     local TFAHudHide = {
-        ["CHudAmmo"] = true,
-        ["CHudSecondaryAmmo"] = true
+        CHudAmmo = true,
+        CHudSecondaryAmmo = true
     }
 
     hook.Add("HUDShouldDraw", "tfa_hidehud", function(name)
-        if TFAHudHide[name] and cv_he:GetBool() then
-            local ictfa = TFA.PlayerCarryingTFAWeapon()
-            if ictfa then
-                return false
-            end
+        if not TFAHudHide[name] or not cv_he:GetBool() then
+            return
+        end
+
+        local ictfa = TFA.PlayerCarryingTFAWeapon()
+        if ictfa then
+            return false
         end
     end)
 end

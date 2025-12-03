@@ -4,12 +4,15 @@ local hook = hook
 local string = string
 local math = math
 local cvars = cvars
+local GetConVar = GetConVar
+local CreateConVar = CreateConVar
+local CreateClientConVar = CreateClientConVar
 
 local function CreateReplConVar(cvarname, cvarvalue, description)
     if CLIENT then
-        return CreateConVar(cvarname, cvarvalue, {FCVAR_REPLICATED}, description)
+        return CreateConVar(cvarname, cvarvalue, { FCVAR_REPLICATED }, description)
     else
-        return CreateConVar(cvarname, cvarvalue, {FCVAR_REPLICATED, FCVAR_ARCHIVE, FCVAR_NOTIFY}, description)
+        return CreateConVar(cvarname, cvarvalue, { FCVAR_REPLICATED, FCVAR_ARCHIVE, FCVAR_NOTIFY }, description)
     end
 end
 
@@ -34,12 +37,16 @@ local cv_dfc = CreateReplConVar("sv_tfa_default_clip", "-1", "How many clips a w
 function TFAUpdateDefaultClip()
     local dfc = cv_dfc:GetInt()
     local weplist = weapons.GetList()
-    if not weplist or #weplist <= 0 then return end
+
+    if not weplist or #weplist <= 0 then
+        return
+    end
 
     for _, v in pairs(weplist) do
         local cl = v.ClassName or v
         local wep = weapons.GetStored(cl)
-        if wep and (wep.IsTFAWeapon or string.find(string.lower(wep.Base or ""), "tfa")) then
+
+        if wep and (wep.IsTFAWeapon or string.find(string.lower(wep.Base or ""), "tfa", 1, true)) then
             wep.Primary = wep.Primary or {}
 
             if not wep.Primary.TrueDefaultClip then
@@ -60,11 +67,12 @@ function TFAUpdateDefaultClip()
 end
 
 hook.Add("InitPostEntity", "TFADefaultClipPE", TFAUpdateDefaultClip)
+
 if TFAUpdateDefaultClip then
     TFAUpdateDefaultClip()
 end
 
-cvars.AddChangeCallback("sv_tfa_default_clip", function(_, _, _)
+cvars.AddChangeCallback("sv_tfa_default_clip", function()
     TFAUpdateDefaultClip()
 end, "TFAUpdateDefaultClip")
 
@@ -73,12 +81,15 @@ EnsureReplConVar("sv_tfa_spread_multiplier", "1", "Increase => more spread, decr
 EnsureReplConVar("sv_tfa_force_multiplier", "1", "Arrow force multiplier, not velocity.")
 EnsureReplConVar("sv_tfa_dynamicaccuracy", "1", "Dynamic accuracy? e.g. more accurate on crouch, less accurate on jump.")
 EnsureReplConVar("sv_tfa_ammo_detonation", "1", "Ammo Detonation? Shoot ammo to explode.")
+
 if not GetConVar("sv_tfa_ammo_detonation_mode") then
-    CreateConVar("sv_tfa_ammo_detonation_mode", "2", {FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_ARCHIVE}, "Ammo Detonation Mode? 0=Bullets,1=Blast,2=Mix")
+    CreateConVar("sv_tfa_ammo_detonation_mode", "2", { FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_ARCHIVE }, "Ammo Detonation Mode? 0=Bullets,1=Blast,2=Mix")
 end
+
 if not GetConVar("sv_tfa_ammo_detonation_chain") then
-    CreateConVar("sv_tfa_ammo_detonation_chain", "1", {FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_ARCHIVE}, "Chain ammo boxes? (0=No, 1=Yes)")
+    CreateConVar("sv_tfa_ammo_detonation_chain", "1", { FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_ARCHIVE }, "Chain ammo boxes? (0=No, 1=Yes)")
 end
+
 EnsureReplConVar("sv_tfa_scope_gun_speed_scale", "0", "Scale player sensitivity by movement speed while scoped?")
 EnsureReplConVar("sv_tfa_bullet_penetration", "1", "Allow bullet penetration?")
 EnsureReplConVar("sv_tfa_holdtype_dynamic", "1", "Allow dynamic holdtype?")
@@ -92,9 +103,11 @@ EnsureReplConVar("sv_tfa_worldmodel_culldistance", "640", "-1 => unculled, else 
 EnsureReplConVar("sv_tfa_reloads_legacy", "0", "Use legacy reload logic?")
 EnsureReplConVar("sv_tfa_fx_penetration_decal", "1", "Decals on other side of penetrated object?")
 EnsureReplConVar("sv_tfa_ironsights_enabled", "1", "Enable ironsights? (Scopes still allowed if disabled.)")
+
 if not GetConVar("sv_tfa_sprint_enabled") then
-    CreateConVar("sv_tfa_sprint_enabled", "1", {FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_ARCHIVE}, "Enable sprinting? 0 => can shoot while IN_SPEED.")
+    CreateConVar("sv_tfa_sprint_enabled", "1", { FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_ARCHIVE }, "Enable sprinting? 0 => can shoot while IN_SPEED.")
 end
+
 EnsureReplConVar("sv_tfa_reloads_enabled", "1", "Enable reloading? 0 => shoot from ammo pool.")
 EnsureReplConVar("sv_tfa_compat_movement", "0", "Enable movement compatibility mode?")
 EnsureReplConVar("sv_tfa_net_idles", "0", "Enable idle anims at cost of big net traffic?")
