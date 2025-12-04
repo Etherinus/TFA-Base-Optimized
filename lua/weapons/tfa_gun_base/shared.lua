@@ -885,6 +885,9 @@ function SWEP:Think2()
 			end
 		end
 
+		if finalstat == TFA.Enum.STATUS_IDLE then
+			self:SetNextIdleAnim(-1)
+		end
 		self:SetStatus(finalstat)
 		self.LastBoltShoot = nil
 		if self:GetBurstCount() > 0 then

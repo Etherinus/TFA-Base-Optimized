@@ -64,6 +64,7 @@ function SWEP:ViewModelDrawn()
 
 	local vm = self.Owner:GetViewModel()
 	if not IsValid(vm) then return end
+	self.OwnerViewModel = vm
 	if not self:GetOwner().GetHands then return end
 
 	if self.UseHands then
@@ -180,9 +181,13 @@ function SWEP:ViewModelDrawn()
 			if (v.hide) then continue end
 			local model = v.curmodel
 			local sprite = v.spritemat
-			if (not v.bone) then continue end
+			if (not v.bone) and (not v.bonemerge) then continue end
 			local pos, ang = self:GetBoneOrientation(self.VElements, v, vm)
-			if (not pos) then continue end
+			if (not pos) and (not v.bonemerge) then continue end
+			if v.bonemerge then
+				pos = pos or Vector(0,0,0)
+				ang = ang or Angle(0,0,0)
+			end
 
 			if (v.type == "Model" and IsValid(model)) then
 				model:SetPos(pos + ang:Forward() * v.pos.x + ang:Right() * v.pos.y + ang:Up() * v.pos.z)

@@ -19,6 +19,7 @@ end
 
 function SWEP:ToggleAkimbo(arg1)
 	if self.Akimbo and ( IsFirstTimePredicted() or ( arg1 and arg1 == "asdf" ) ) then
+		if type(self.AnimCycle) ~= "number" then self.AnimCycle = 0 end
 		self.AnimCycle = 1 - self.AnimCycle
 	end
 	if SERVER and game.SinglePlayer() then
