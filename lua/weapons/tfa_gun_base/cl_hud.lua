@@ -26,6 +26,14 @@ end
 local c_red = Color(255, 0, 0, 255)
 local c_grn = Color(0, 255, 0, 255)
 
+local function L(key)
+	if TFA and TFA.GetLangString then
+		return TFA.GetLangString(key)
+	end
+
+	return key
+end
+
 local hostilenpcmaps = {
 	["gm_lasers"] = true,
 	["gm_locals"] = true,
@@ -264,12 +272,12 @@ local hexpositions = {
 }
 
 SWEP.AmmoTypeStrings = {
-	["pistol"] = "Generic Pistol",
-	["smg1"] = "Generic SMG",
-	["ar2"] = "Generic Rifle",
-	["buckshot"] = "Generic Shotgun",
-	["357"] = "Generic Revolver",
-	["SniperPenetratedRound"] = "Generic Sniper"
+	["pistol"] = "hud_ammo_generic_pistol",
+	["smg1"] = "hud_ammo_generic_smg",
+	["ar2"] = "hud_ammo_generic_rifle",
+	["buckshot"] = "hud_ammo_generic_shotgun",
+	["357"] = "hud_ammo_generic_revolver",
+	["SniperPenetratedRound"] = "hud_ammo_generic_sniper"
 }
 
 local function hexpaint1(myself, w, h)
@@ -457,7 +465,7 @@ function SWEP:GenerateInspectionDerma()
 	descriptiontext:SetSize(screenwidth - lbound, 24)
 	descriptiontext.Paint = TextShadowPaint
 	local rpmtext = contentpanel:Add("DPanel")
-	rpmtext.Text = infotextpad .. "Firerate: " .. math.floor(self.Primary.RPM) .. "RPM"
+	rpmtext.Text = string.format("%s%s: %sRPM", infotextpad, L("hud_inspect_firerate"), math.floor(self.Primary.RPM))
 
 	rpmtext.Think = function(myself)
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
@@ -468,7 +476,8 @@ function SWEP:GenerateInspectionDerma()
 	rpmtext:SetSize(screenwidth - lbound, 24)
 	rpmtext.Paint = TextShadowPaint
 	local capacitytext = contentpanel:Add("DPanel")
-	capacitytext.Text = infotextpad .. "Capacity: " .. self.Primary.ClipSize .. (self:CanChamber() and (self.Akimbo and " + 2" or " + 1") or "") .. " Rounds"
+	local chamber = self:CanChamber() and (self.Akimbo and " + 2" or " + 1") or ""
+	capacitytext.Text = string.format("%s%s: %s%s %s", infotextpad, L("hud_inspect_capacity"), self.Primary.ClipSize, chamber, L("hud_inspect_rounds"))
 
 	capacitytext.Think = function(myself)
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
@@ -482,7 +491,8 @@ function SWEP:GenerateInspectionDerma()
 
 	if an and an ~= "" and string.len(an) > 1 then
 		local ammotypetext = contentpanel:Add("DPanel")
-		ammotypetext.Text = infotextpad .. "Ammo: " .. (self.AmmoTypeStrings[self.Primary.Ammo or "ammo"] or language.GetPhrase(an .. "_ammo"))
+		local ammoName = self.AmmoTypeStrings[self.Primary.Ammo or "ammo"] or language.GetPhrase(an .. "_ammo")
+		ammotypetext.Text = string.format("%s%s: %s", infotextpad, L("hud_inspect_ammo"), L(ammoName))
 
 		ammotypetext.Think = function(myself)
 			myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
@@ -501,7 +511,7 @@ function SWEP:GenerateInspectionDerma()
 		mymaker = "The Forgotten Architect"
 	end
 
-	makertext.Text = infotextpad .. "Maker: " .. mymaker
+	makertext.Text = string.format("%s%s: %s", infotextpad, L("hud_inspect_maker"), mymaker)
 
 	makertext.Think = function(myself)
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
@@ -587,7 +597,7 @@ function SWEP:GenerateInspectionDerma()
 
 	accuracytext.Think = function(myself)
 		if not IsValid(self) then return end
-		local accuracystr = "Accuracy: " .. math.Round((self.Primary.Spread or self.Primary.Accuracy) * 90) .. "°"
+		local accuracystr = L("hud_inspect_accuracy") .. ": " .. math.Round((self.Primary.Spread or self.Primary.Accuracy) * 90) .. "°"
 
 		if self.Secondary.Ironsights ~= 0 then
 			accuracystr = accuracystr .. " || " .. math.Round((self.Primary.IronAccuracy or self.Primary.IronSpread) * 90) .. "°"
@@ -616,7 +626,7 @@ function SWEP:GenerateInspectionDerma()
 
 	fireratetext.Think = function(myself)
 		if not IsValid(self) then return end
-		local fireratestr = "Firerate: " .. self.Primary.RPM .. "RPM"
+		local fireratestr = L("hud_inspect_firerate") .. ": " .. self.Primary.RPM .. "RPM"
 		myself.Text = fireratestr
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
 	end
@@ -640,7 +650,7 @@ function SWEP:GenerateInspectionDerma()
 
 	mobilitytext.Think = function(myself)
 		if not IsValid(self) then return end
-		myself.Text = "Mobility: " .. math.Round(self.MoveSpeed * 100) .. "%"
+		myself.Text = L("hud_inspect_mobility") .. ": " .. math.Round(self.MoveSpeed * 100) .. "%"
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
 	end
 
@@ -663,7 +673,7 @@ function SWEP:GenerateInspectionDerma()
 
 	damagetext.Think = function(myself)
 		if not IsValid(self) then return end
-		local dmgstr = "Damage: " .. math.Round(self.Primary.Damage)
+		local dmgstr = L("hud_inspect_damage") .. ": " .. math.Round(self.Primary.Damage)
 
 		if self.Primary.NumShots ~= 1 then
 			dmgstr = dmgstr .. "x" .. math.Round(self.Primary.NumShots)
@@ -693,7 +703,7 @@ function SWEP:GenerateInspectionDerma()
 
 	rangetext.Think = function(myself)
 		if not IsValid(self) then return end
-		rangestr = "Range: " .. math.Round(feettokm(sourcetofeet(self.Primary.Range)) * 100) / 100 .. "K"
+		rangestr = L("hud_inspect_range") .. ": " .. math.Round(feettokm(sourcetofeet(self.Primary.Range)) * 100) / 100 .. "K"
 		myself.Text = rangestr
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
 	end
@@ -718,7 +728,7 @@ function SWEP:GenerateInspectionDerma()
 
 	stabilitytext.Think = function(myself)
 		if not IsValid(self) then return end
-		stabilitystr = "Stability: " .. math.Clamp(math.Round((1 - math.abs(self.Primary.KickUp + self.Primary.KickDown) / 2 / 1) * 100), 0, 100) .. "%"
+		stabilitystr = L("hud_inspect_stability") .. ": " .. math.Clamp(math.Round((1 - math.abs(self.Primary.KickUp + self.Primary.KickDown) / 2 / 1) * 100), 0, 100) .. "%"
 		myself.Text = stabilitystr
 		myself.TextColor = TFA_INSPECTIONPANEL.SecondaryColor
 	end
@@ -1210,26 +1220,37 @@ function SWEP:DrawHUDAmmo()
 		yy = postoscreen.y
 
 		if self.InspectingProgress < 0.01 and self.Primary.Ammo ~= "" and self.Primary.Ammo ~= 0 then
+			local labelMag = string.upper(L("hud_inspect_mag"))
+			local labelReserve = string.upper(L("hud_inspect_reserve"))
+			local labelAmmoShort = string.upper(L("hud_inspect_ammo_short"))
+			local labelAltMag = string.upper(L("hud_inspect_alt_mag"))
+			local labelAltReserve = string.upper(L("hud_inspect_alt_reserve"))
+			local labelAltAmmo = string.upper(L("hud_inspect_alt_ammo"))
+			local labelRpm = string.upper(L("hud_inspect_rpm"))
+			local labelDamage = string.upper(L("hud_inspect_damage"))
+			local labelRange = string.upper(L("hud_inspect_range"))
+			local labelSpread = string.upper(L("hud_inspect_spread"))
+			local labelSpreadMax = string.upper(L("hud_inspect_spread_max"))
 			local str
 
 			if self.Primary.ClipSize and self.Primary.ClipSize ~= -1 then
 				if self.Akimbo then
-					str = string.upper("MAG: " .. math.ceil(self:Clip1() / 2))
+					str = labelMag .. ": " .. math.ceil(self:Clip1() / 2)
 
 					if (self:Clip1() > self.Primary.ClipSize) then
-						str = string.upper("MAG: " .. math.ceil(self:Clip1() / 2 ) - 1 .. " + " .. ( math.ceil(self:Clip1() / 2) - math.ceil(self.Primary.ClipSize / 2)))
+						str = labelMag .. ": " .. math.ceil(self:Clip1() / 2 ) - 1 .. " + " .. ( math.ceil(self:Clip1() / 2) - math.ceil(self.Primary.ClipSize / 2))
 					end
 				else
-					str = string.upper("MAG: " .. self:Clip1())
+					str = labelMag .. ": " .. self:Clip1()
 
 					if (self:Clip1() > self.Primary.ClipSize) then
-						str = string.upper("MAG: " .. self.Primary.ClipSize .. " + " .. (self:Clip1() - self.Primary.ClipSize))
+						str = labelMag .. ": " .. self.Primary.ClipSize .. " + " .. (self:Clip1() - self.Primary.ClipSize)
 					end
 				end
 
 				draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 				draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
-				str = string.upper("RESERVE: " .. self:Ammo1())
+				str = labelReserve .. ": " .. self:Ammo1()
 				yy = yy + TFASleekFontHeight
 				xx = xx - TFASleekFontHeight / 3
 				draw.DrawText(str, "TFASleekMedium", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
@@ -1237,7 +1258,7 @@ function SWEP:DrawHUDAmmo()
 				yy = yy + TFASleekFontHeightMedium
 				xx = xx - TFASleekFontHeightMedium / 3
 			else
-				str = string.upper("AMMO: " .. self:Ammo1())
+				str = labelAmmoShort .. ": " .. self:Ammo1()
 				draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 				draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 				yy = yy + TFASleekFontHeightMedium
@@ -1267,15 +1288,15 @@ function SWEP:DrawHUDAmmo()
 
 
 					if self.Primary.ClipSize and self.Primary.ClipSize ~= -1 then
-						str = string.upper("MAG: " .. math.floor(self:Clip1() / 2))
+						str = labelMag .. ": " .. math.floor(self:Clip1() / 2)
 
 						if ( math.floor(self:Clip1() / 2) > math.floor(self.Primary.ClipSize / 2) ) then
-							str = string.upper("MAG: " .. math.floor(self:Clip1() / 2 ) - 1 .. " + " .. ( math.floor(self:Clip1() / 2) - math.floor(self.Primary.ClipSize / 2)))
+							str = labelMag .. ": " .. math.floor(self:Clip1() / 2 ) - 1 .. " + " .. ( math.floor(self:Clip1() / 2) - math.floor(self.Primary.ClipSize / 2))
 						end
 
 						draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 						draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
-						str = string.upper("RESERVE: " .. self:Ammo1())
+						str = labelReserve .. ": " .. self:Ammo1()
 						yy = yy + TFASleekFontHeight
 						xx = xx - TFASleekFontHeight / 3
 						draw.DrawText(str, "TFASleekMedium", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
@@ -1283,7 +1304,7 @@ function SWEP:DrawHUDAmmo()
 						yy = yy + TFASleekFontHeightMedium
 						xx = xx - TFASleekFontHeightMedium / 3
 					else
-						str = string.upper("AMMO: " .. self:Ammo1())
+						str = labelAmmoShort .. ": " .. self:Ammo1()
 						draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 						draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 						yy = yy + TFASleekFontHeightMedium
@@ -1298,11 +1319,11 @@ function SWEP:DrawHUDAmmo()
 
 			if self.Secondary.Ammo and self.Secondary.Ammo ~= "" and self.Secondary.Ammo ~= "none" and self.Secondary.Ammo ~= 0 and not self.Akimbo then
 				if self.Secondary.ClipSize and self.Secondary.ClipSize ~= -1 then
-					str = (self:Clip2() > self.Secondary.ClipSize) and string.upper("ALT-MAG: " .. self.Secondary.ClipSize .. " + " .. (self:Clip2() - self.Primary.ClipSize)) or string.upper("ALT-MAG: " .. self:Clip2())
+					str = (self:Clip2() > self.Secondary.ClipSize) and (labelAltMag .. ": " .. self.Secondary.ClipSize .. " + " .. (self:Clip2() - self.Primary.ClipSize)) or (labelAltMag .. ": " .. self:Clip2())
 
 					draw.DrawText(str, "TFASleekSmall", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 					draw.DrawText(str, "TFASleekSmall", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
-					str = string.upper("ALT-RESERVE: " .. self:Ammo2())
+					str = labelAltReserve .. ": " .. self:Ammo2()
 					yy = yy + TFASleekFontHeight
 					xx = xx - TFASleekFontHeight / 3
 					draw.DrawText(str, "TFASleekSmall", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
@@ -1310,7 +1331,7 @@ function SWEP:DrawHUDAmmo()
 					yy = yy + TFASleekFontHeightMedium
 					xx = xx - TFASleekFontHeightMedium / 3
 				else
-					str = string.upper("ALT-AMMO: " .. self:Ammo2())
+					str = labelAltAmmo .. ": " .. self:Ammo2()
 					draw.DrawText(str, "TFASleekSmall", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 					draw.DrawText(str, "TFASleekSmall", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 					yy = yy + TFASleekFontHeightMedium
@@ -1318,7 +1339,7 @@ function SWEP:DrawHUDAmmo()
 				end
 			end
 		elseif cvar_tfa_inspection_old:GetBool() then
-			local str = string.upper("DAMAGE: " .. RoundDecimals(self.Primary.Damage, 1))
+			local str = labelDamage .. ": " .. RoundDecimals(self.Primary.Damage, 1)
 
 			if self.Primary.NumShots and self.Primary.NumShots > 1 then
 				str = str .. "x" .. math.Round(self.Primary.NumShots)
@@ -1330,19 +1351,19 @@ function SWEP:DrawHUDAmmo()
 			draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 			draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 			yy = yy + TFASleekFontHeight
-			str = string.upper("RPM: " .. RoundDecimals(self.Primary.RPM, 1))
+			str = labelRpm .. ": " .. RoundDecimals(self.Primary.RPM, 1)
 			draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 			draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 			yy = yy + TFASleekFontHeight
-			str = string.upper("Range: " .. RoundDecimals(self.Primary.Range / 16000 * 0.305, 3) .. "KM")
+			str = labelRange .. ": " .. RoundDecimals(self.Primary.Range / 16000 * 0.305, 3) .. "KM"
 			draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 			draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 			yy = yy + TFASleekFontHeight
-			str = string.upper("Spread: " .. RoundDecimals(self.Primary.Spread and self.Primary.Spread or self.Primary.Accuracy, 2))
+			str = labelSpread .. ": " .. RoundDecimals(self.Primary.Spread and self.Primary.Spread or self.Primary.Accuracy, 2)
 			draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 			draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 			yy = yy + TFASleekFontHeight
-			str = string.upper("Spread Max: " .. RoundDecimals(self.Primary.SpreadMultiplierMax, 2))
+			str = labelSpreadMax .. ": " .. RoundDecimals(self.Primary.SpreadMultiplierMax, 2)
 			draw.DrawText(str, "TFASleek", xx + 1, yy + 1, ColorAlpha(self.TextColContrast, myalpha), TEXT_ALIGN_RIGHT)
 			draw.DrawText(str, "TFASleek", xx, yy, ColorAlpha(self.TextCol, myalpha), TEXT_ALIGN_RIGHT)
 			yy = yy + TFASleekFontHeight

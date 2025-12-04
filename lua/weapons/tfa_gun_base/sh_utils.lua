@@ -1,5 +1,13 @@
 local oiv = nil
 
+local function L(key)
+	if TFA and TFA.GetLangString then
+		return TFA.GetLangString(key)
+	end
+
+	return key
+end
+
 function SWEP:NZAnimationSpeed()
 	return 1
 end
@@ -372,36 +380,39 @@ function SWEP:GetFireModeName()
 	local fm = self:GetFireMode()
 	local fireModeEntry = self.FireModes and self.FireModes[fm]
 	if not fireModeEntry then
-		return "Auto"
+		return L("hud_firemode_auto")
 	end
 
 	local fmn = string.lower( tostring(fireModeEntry) )
-	if fmn == "safe" or fmn == "holster" then return "Safety" end
-	if self.FireModeName then return self.FireModeName end
-	if fmn == "auto" or fmn == "automatic" then return "Full-Auto" end
+	if fmn == "safe" or fmn == "holster" then return L("hud_firemode_safety") end
+	if self.FireModeName then return L(self.FireModeName) end
+	if fmn == "auto" or fmn == "automatic" then return L("hud_firemode_full_auto") end
 
 	if fmn == "semi" or fmn == "single" then
 		if self.Revolver then
 			if (self.BoltAction) then
-				return "Single-Action"
+				return L("hud_firemode_single_action")
 			else
-				return "Double-Action"
+				return L("hud_firemode_double_action")
 			end
 		else
 			if (self.BoltAction) then
-				return "Bolt-Action"
+				return L("hud_firemode_bolt_action")
 			else
 				if (self.Shotgun and self.Primary.RPM < 250) then
-					return "Pump-Action"
+					return L("hud_firemode_pump_action")
 				else
-					return "Semi-Auto"
+					return L("hud_firemode_semi_auto")
 				end
 			end
 		end
 	end
 
 	local bpos = string.find(fmn, "burst")
-	if bpos then return string.sub(fmn, 1, bpos - 1) .. " Round Burst" end
+	if bpos then
+		local count = string.Trim(string.sub(fmn, 1, bpos - 1))
+		return string.format(L("hud_firemode_burst"), count)
+	end
 	return ""
 end
 

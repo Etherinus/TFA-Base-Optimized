@@ -121,6 +121,7 @@ if CLIENT then
         end
     end
 
+    EnsureClientConVar("cl_tfa_language", "en", true, true)
     EnsureClientConVar("cl_tfa_forcearms", "1", true, true)
     EnsureClientConVar("cl_tfa_inspection_old", "0", true, true)
     EnsureClientConVar("cl_tfa_inspection_ckey", "0", true, true)

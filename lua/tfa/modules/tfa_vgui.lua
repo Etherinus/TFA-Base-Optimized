@@ -1,6 +1,23 @@
 if CLIENT then
     local spawnmenu_AddToolMenuOption = spawnmenu.AddToolMenuOption
+    local spawnmenu_RebuildToolMenu = spawnmenu.RebuildToolMenu
     local hook_Add = hook.Add
+    local cvars_AddChangeCallback = cvars.AddChangeCallback
+    local RunConsoleCommand = RunConsoleCommand
+    local GetConVar = GetConVar
+    local timer_Simple = timer.Simple
+
+    local function L(key)
+        if TFA and TFA.GetLangString then
+            return TFA.GetLangString(key)
+        end
+
+        return key
+    end
+
+    local function addFooter(panel)
+        panel:AddControl("Label", { Text = L("ui_footer") })
+    end
 
     local function tfaOptionServer(panel)
         local tfaOptionSV = {
@@ -34,52 +51,52 @@ if CLIENT then
         panel:AddControl("ComboBox", tfaOptionSV)
 
         panel:AddControl("CheckBox", {
-            Label = "Require reload keypress",
+            Label = L("ui_sv_allow_dryfire"),
             Command = "sv_tfa_allow_dryfire"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Dynamic Accuracy",
+            Label = L("ui_sv_dynamicaccuracy"),
             Command = "sv_tfa_dynamicaccuracy"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Strip Empty Weapons",
+            Label = L("ui_sv_weapon_strip"),
             Command = "sv_tfa_weapon_strip"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Ironsights",
+            Label = L("ui_sv_ironsights_enabled"),
             Command = "sv_tfa_ironsights_enabled"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Modern-Style Sprinting",
+            Label = L("ui_sv_sprint_enabled"),
             Command = "sv_tfa_sprint_enabled"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Custom C-Menu",
+            Label = L("ui_sv_cmenu"),
             Command = "sv_tfa_cmenu"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Bullet Penetration",
+            Label = L("ui_sv_bullet_penetration"),
             Command = "sv_tfa_bullet_penetration"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Reloading",
+            Label = L("ui_sv_reloads_enabled"),
             Command = "sv_tfa_reloads_enabled"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Legacy-Style Reloading",
+            Label = L("ui_sv_reloads_legacy"),
             Command = "sv_tfa_reloads_legacy"
         })
 
         panel:AddControl("Slider", {
-            Label = "Damage Multiplier",
+            Label = L("ui_sv_damage_multiplier"),
             Command = "sv_tfa_damage_multiplier",
             Type = "Float",
             Min = "0",
@@ -87,7 +104,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Door Respawn Time",
+            Label = L("ui_sv_door_respawn"),
             Command = "sv_tfa_door_respawn",
             Type = "Integer",
             Min = "-1",
@@ -95,7 +112,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Impact Force Multiplier",
+            Label = L("ui_sv_force_multiplier"),
             Command = "sv_tfa_force_multiplier",
             Type = "Float",
             Min = "0",
@@ -103,7 +120,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Spread Multiplier",
+            Label = L("ui_sv_spread_multiplier"),
             Command = "sv_tfa_spread_multiplier",
             Type = "Float",
             Min = "0",
@@ -111,7 +128,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Penetration Count Limit",
+            Label = L("ui_sv_penetration_limit"),
             Command = "sv_tfa_penetration_limit",
             Type = "Integer",
             Min = "0",
@@ -119,7 +136,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Default Clip Count (-1 = default)",
+            Label = L("ui_sv_default_clip"),
             Command = "sv_tfa_default_clip",
             Type = "Integer",
             Min = "-1",
@@ -127,16 +144,14 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Bullet Range Damage Degradation",
+            Label = L("ui_sv_range_modifier"),
             Command = "sv_tfa_range_modifier",
             Type = "Float",
             Min = "0",
             Max = "1"
         })
 
-        panel:AddControl("Label", {
-            Text = "Creator of TFA Base By TheForgottenArchitect\nOptimizer of TFA Base By Etherinus"
-        })
+        addFooter(panel)
     end
 
     local function tfaOptionClient(panel)
@@ -173,57 +188,57 @@ if CLIENT then
         panel:AddControl("ComboBox", tfaOptionCL)
 
         panel:AddControl("CheckBox", {
-            Label = "Force Refugee Arms",
+            Label = L("ui_cl_forcearms"),
             Command = "cl_tfa_forcearms"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable 3D Scopes (Re-Draw Gun After Changing)",
+            Label = L("ui_cl_3dscope"),
             Command = "cl_tfa_3dscope"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable 3D Scope Shadows (Re-Draw Gun After Changing)",
+            Label = L("ui_cl_3dscope_overlay"),
             Command = "cl_tfa_3dscope_overlay"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Viewbob While Drawing",
+            Label = L("ui_cl_viewbob_drawing"),
             Command = "cl_tfa_viewbob_drawing"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Viewbob While Reloading",
+            Label = L("ui_cl_viewbob_reloading"),
             Command = "cl_tfa_viewbob_reloading"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Context Key Inspection",
+            Label = L("ui_cl_inspection_ckey"),
             Command = "cl_tfa_inspection_ckey"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Legacy Text Inspection",
+            Label = L("ui_cl_inspection_old"),
             Command = "cl_tfa_inspection_old"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Toggle Ironsights",
+            Label = L("ui_cl_ironsights_toggle"),
             Command = "cl_tfa_ironsights_toggle"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Preserve Sights On Reload, Sprint, etc.",
+            Label = L("ui_cl_ironsights_resight"),
             Command = "cl_tfa_ironsights_resight"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Compensate sensitivity for FOV",
+            Label = L("ui_cl_scope_sensitivity_autoscale"),
             Command = "cl_tfa_scope_sensitivity_autoscale"
         })
 
         panel:AddControl("Slider", {
-            Label = "Scope sensitivity",
+            Label = L("ui_cl_scope_sensitivity"),
             Command = "cl_tfa_scope_sensitivity",
             Type = "Integer",
             Min = "1",
@@ -231,7 +246,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Gun Bob Intensity",
+            Label = L("ui_cl_gunbob_intensity"),
             Command = "cl_tfa_gunbob_intensity",
             Type = "Float",
             Min = "0",
@@ -239,7 +254,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "View Bob Intensity",
+            Label = L("ui_cl_viewbob_intensity"),
             Command = "cl_tfa_viewbob_intensity",
             Type = "Float",
             Min = "0",
@@ -247,7 +262,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Viewmodel Offset - X",
+            Label = L("ui_cl_viewmodel_offset_x"),
             Command = "cl_tfa_viewmodel_offset_x",
             Type = "Float",
             Min = "-2",
@@ -255,7 +270,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Viewmodel Offset - Y",
+            Label = L("ui_cl_viewmodel_offset_y"),
             Command = "cl_tfa_viewmodel_offset_y",
             Type = "Float",
             Min = "-2",
@@ -263,7 +278,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Viewmodel Offset - Z",
+            Label = L("ui_cl_viewmodel_offset_z"),
             Command = "cl_tfa_viewmodel_offset_z",
             Type = "Float",
             Min = "-2",
@@ -271,7 +286,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Viewmodel Offset - FOV",
+            Label = L("ui_cl_viewmodel_offset_fov"),
             Command = "cl_tfa_viewmodel_offset_fov",
             Type = "Float",
             Min = "-5",
@@ -279,18 +294,16 @@ if CLIENT then
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Centered Viewmodel",
+            Label = L("ui_cl_viewmodel_centered"),
             Command = "cl_tfa_viewmodel_centered"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Left Handed Viewmodel (Buggy)",
+            Label = L("ui_cl_viewmodel_flip"),
             Command = "cl_tfa_viewmodel_flip"
         })
 
-        panel:AddControl("Label", {
-            Text = "Creator of TFA Base By TheForgottenArchitect\nOptimizer of TFA Base By Etherinus"
-        })
+        addFooter(panel)
     end
 
     local function tfaOptionPerformance(panel)
@@ -318,41 +331,41 @@ if CLIENT then
         panel:AddControl("ComboBox", tfaOptionPerf)
 
         panel:AddControl("CheckBox", {
-            Label = "Use Gas Blur",
+            Label = L("ui_perf_fx_gasblur"),
             Command = "cl_tfa_fx_gasblur"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Muzzle Smoke Trails",
+            Label = L("ui_perf_fx_muzzlesmoke"),
             Command = "cl_tfa_fx_muzzlesmoke"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Ejection Smoke",
+            Label = L("ui_perf_fx_ejectionsmoke"),
             Command = "cl_tfa_fx_ejectionsmoke"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Custom Impact FX",
+            Label = L("ui_perf_fx_impact"),
             Command = "cl_tfa_fx_impact_enabled"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Inspection BokehDOF",
+            Label = L("ui_perf_inspection_bokeh"),
             Command = "cl_tfa_inspection_bokeh"
         })
 
         panel:AddControl("Label", {
-            Text = "Performance Overrides (Serverside)"
+            Text = L("ui_perf_overrides")
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Penetration Decal (SV)",
+            Label = L("ui_sv_penetration_decal"),
             Command = "sv_tfa_fx_penetration_decal"
         })
 
         panel:AddControl("Slider", {
-            Label = "Gas Blur Effect Override (-1 to leave clientside)",
+            Label = L("ui_sv_fx_gas_override"),
             Command = "sv_tfa_fx_gas_override",
             Type = "Integer",
             Min = "-1",
@@ -360,7 +373,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Impact Effect Override (-1 to leave clientside)",
+            Label = L("ui_sv_fx_impact_override"),
             Command = "sv_tfa_fx_impact_override",
             Type = "Integer",
             Min = "-1",
@@ -368,7 +381,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Muzzle Smoke Effect Override (-1 to leave clientside)",
+            Label = L("ui_sv_fx_muzzlesmoke_override"),
             Command = "sv_tfa_fx_muzzlesmoke_override",
             Type = "Integer",
             Min = "-1",
@@ -376,7 +389,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Ejection Smoke Effect Override (-1 to leave clientside)",
+            Label = L("ui_sv_fx_ejectionsmoke_override"),
             Command = "sv_tfa_fx_ejectionsmoke_override",
             Type = "Integer",
             Min = "-1",
@@ -384,16 +397,14 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "World Model Cull Distance (-1 to disable)",
+            Label = L("ui_sv_worldmodel_culldistance"),
             Command = "sv_tfa_worldmodel_culldistance",
             Type = "Integer",
             Min = "-1",
             Max = "4096"
         })
 
-        panel:AddControl("Label", {
-            Text = "Creator of TFA Base By TheForgottenArchitect\nOptimizer of TFA Base By Etherinus"
-        })
+        addFooter(panel)
     end
 
     local function tfaOptionHUD(panel)
@@ -439,12 +450,12 @@ if CLIENT then
         panel:AddControl("ComboBox", tfaTBLOptionHUD)
 
         panel:AddControl("CheckBox", {
-            Label = "Use Custom HUD",
+            Label = L("ui_hud_custom"),
             Command = "cl_tfa_hud_enabled"
         })
 
         panel:AddControl("Slider", {
-            Label = "Ammo HUD Fadein Time",
+            Label = L("ui_hud_ammo_fadein"),
             Command = "cl_tfa_hud_ammodata_fadein",
             Type = "Float",
             Min = "0.01",
@@ -452,32 +463,32 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "HUD Hang Time (after a reload, etc.)",
+            Label = L("ui_hud_hangtime"),
             Command = "cl_tfa_hud_hangtime",
             Type = "Float",
             Min = "0",
             Max = "5"
         })
 
-        panel:AddControl("Label", { Text = "-Crosshair Options-" })
+        panel:AddControl("Label", { Text = L("ui_crosshair_section") })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Custom Crosshair",
+            Label = L("ui_crosshair_custom"),
             Command = "cl_tfa_hud_crosshair_enable_custom"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Use Crosshair Dot",
+            Label = L("ui_crosshair_dot"),
             Command = "cl_tfa_hud_crosshair_dot"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Crosshair Length In Pixels?",
+            Label = L("ui_crosshair_length_pixels"),
             Command = "cl_tfa_hud_crosshair_length_use_pixels"
         })
 
         panel:AddControl("Slider", {
-            Label = "Crosshair Length",
+            Label = L("ui_crosshair_length"),
             Command = "cl_tfa_hud_crosshair_length",
             Type = "Float",
             Min = "0",
@@ -485,7 +496,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Crosshair Gap Scale",
+            Label = L("ui_crosshair_gap_scale"),
             Command = "cl_tfa_hud_crosshair_gap_scale",
             Type = "Float",
             Min = "0",
@@ -493,7 +504,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Crosshair Width",
+            Label = L("ui_crosshair_width"),
             Command = "cl_tfa_hud_crosshair_width",
             Type = "Integer",
             Min = "0",
@@ -501,7 +512,7 @@ if CLIENT then
         })
 
         panel:AddControl("Color", {
-            Label = "Crosshair Color",
+            Label = L("ui_crosshair_color"),
             Red = "cl_tfa_hud_crosshair_color_r",
             Green = "cl_tfa_hud_crosshair_color_g",
             Blue = "cl_tfa_hud_crosshair_color_b",
@@ -512,17 +523,17 @@ if CLIENT then
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Crosshair Teamcolor",
+            Label = L("ui_crosshair_teamcolor"),
             Command = "cl_tfa_hud_crosshair_color_team"
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Crosshair Outline",
+            Label = L("ui_crosshair_outline"),
             Command = "cl_tfa_hud_crosshair_outline_enabled"
         })
 
         panel:AddControl("Slider", {
-            Label = "Crosshair Outline Width",
+            Label = L("ui_crosshair_outline_width"),
             Command = "cl_tfa_hud_crosshair_outline_width",
             Type = "Integer",
             Min = "0",
@@ -530,7 +541,7 @@ if CLIENT then
         })
 
         panel:AddControl("Color", {
-            Label = "Crosshair Outline Color",
+            Label = L("ui_crosshair_outline_color"),
             Red = "cl_tfa_hud_crosshair_outline_color_r",
             Green = "cl_tfa_hud_crosshair_outline_color_g",
             Blue = "cl_tfa_hud_crosshair_outline_color_b",
@@ -541,12 +552,12 @@ if CLIENT then
         })
 
         panel:AddControl("CheckBox", {
-            Label = "Enable Hitmarker",
+            Label = L("ui_hitmarker_enable"),
             Command = "cl_tfa_hud_hitmarker_enabled"
         })
 
         panel:AddControl("Slider", {
-            Label = "Hitmarker Solid Time",
+            Label = L("ui_hitmarker_solid_time"),
             Command = "cl_tfa_hud_hitmarker_solidtime",
             Type = "Float",
             Min = "0",
@@ -554,7 +565,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Hitmarker Fade Time",
+            Label = L("ui_hitmarker_fade_time"),
             Command = "cl_tfa_hud_hitmarker_fadetime",
             Type = "Float",
             Min = "0",
@@ -562,7 +573,7 @@ if CLIENT then
         })
 
         panel:AddControl("Slider", {
-            Label = "Hitmarker Scale",
+            Label = L("ui_hitmarker_scale"),
             Command = "cl_tfa_hud_hitmarker_scale",
             Type = "Float",
             Min = "0",
@@ -570,7 +581,7 @@ if CLIENT then
         })
 
         panel:AddControl("Color", {
-            Label = "Hitmarker Color",
+            Label = L("ui_hitmarker_color"),
             Red = "cl_tfa_hud_hitmarker_color_r",
             Green = "cl_tfa_hud_hitmarker_color_g",
             Blue = "cl_tfa_hud_hitmarker_color_b",
@@ -580,9 +591,7 @@ if CLIENT then
             Multiplier = 255
         })
 
-        panel:AddControl("Label", {
-            Text = "Creator of TFA Base By TheForgottenArchitect\nOptimizer of TFA Base By Etherinus"
-        })
+        addFooter(panel)
     end
 
     local function tfaOptionDeveloper(panel)
@@ -599,23 +608,76 @@ if CLIENT then
         panel:AddControl("ComboBox", tfaOptionPerf)
 
         panel:AddControl("CheckBox", {
-            Label = "Force Debug Crosshair",
+            Label = L("ui_debug_crosshair"),
             Command = "cl_tfa_debugcrosshair"
         })
 
-        panel:AddControl("Label", {
-            Text = "Creator of TFA Base By TheForgottenArchitect\nOptimizer of TFA Base By Etherinus"
-        })
+        addFooter(panel)
+    end
+
+    local function tfaOptionLanguage(panel)
+        panel:ControlHelp(L("ui_language_desc"))
+        panel:ControlHelp(L("ui_language_note"))
+
+        local combo = panel:ComboBox(L("ui_language_label"), "cl_tfa_language")
+
+        if combo.SetSortItems then
+            combo:SetSortItems(false)
+        end
+
+        local choices = { "en", "ru", "fr", "de" }
+
+        for _, code in ipairs(choices) do
+            combo:AddChoice(L("ui_language_option_" .. code), code, false)
+        end
+
+        local current = GetConVar and GetConVar("cl_tfa_language")
+        local selected = current and current:GetString() or "en"
+
+        if selected == "" then
+            selected = "en"
+        end
+
+        for id, code in ipairs(choices) do
+            if code == selected then
+                combo:ChooseOptionID(id)
+                break
+            end
+        end
+
+        function combo:OnSelect(_, _, data)
+            if data then
+                RunConsoleCommand("cl_tfa_language", data)
+            end
+        end
+
+        addFooter(panel)
     end
 
     function tfaAddOption()
-        spawnmenu_AddToolMenuOption("Options", "TFA SWEP Base Settings", "tfaOptionWeapons", "Weapon Behavior, Clientside", "", "", tfaOptionClient)
-        spawnmenu_AddToolMenuOption("Options", "TFA SWEP Base Settings", "tfaOptionPerformance", "Performance", "", "", tfaOptionPerformance)
-        spawnmenu_AddToolMenuOption("Options", "TFA SWEP Base Settings", "TFASwepBaseCrosshair", "HUD / Crosshair", "", "", tfaOptionHUD)
-        spawnmenu_AddToolMenuOption("Options", "TFA SWEP Base Settings", "TFASwepBaseDeveloper", "Developer", "", "", tfaOptionDeveloper)
-        spawnmenu_AddToolMenuOption("Options", "TFA SWEP Base Settings", "TFASwepBaseServer", "Admin / Server", "", "", tfaOptionServer)
+        local category = L("ui_menu_title")
+
+        spawnmenu_AddToolMenuOption("Options", category, "TFASwepBaseLanguage", L("ui_cat_language"), "", "", tfaOptionLanguage)
+        spawnmenu_AddToolMenuOption("Options", category, "tfaOptionWeapons", L("ui_cat_client"), "", "", tfaOptionClient)
+        spawnmenu_AddToolMenuOption("Options", category, "tfaOptionPerformance", L("ui_cat_performance"), "", "", tfaOptionPerformance)
+        spawnmenu_AddToolMenuOption("Options", category, "TFASwepBaseCrosshair", L("ui_cat_hud"), "", "", tfaOptionHUD)
+        spawnmenu_AddToolMenuOption("Options", category, "TFASwepBaseDeveloper", L("ui_cat_developer"), "", "", tfaOptionDeveloper)
+        spawnmenu_AddToolMenuOption("Options", category, "TFASwepBaseServer", L("ui_cat_server"), "", "", tfaOptionServer)
     end
 
+    local function refreshLanguage()
+        if not spawnmenu_RebuildToolMenu then
+            return
+        end
+
+        timer_Simple(0, function()
+            if spawnmenu_RebuildToolMenu then
+                spawnmenu_RebuildToolMenu()
+            end
+        end)
+    end
+
+    cvars_AddChangeCallback("cl_tfa_language", refreshLanguage, "tfaLangRefresh")
     hook_Add("PopulateToolMenu", "tfaAddOption", tfaAddOption)
 else
     AddCSLuaFile()
