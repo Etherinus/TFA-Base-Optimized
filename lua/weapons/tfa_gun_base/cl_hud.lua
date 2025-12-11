@@ -26,6 +26,24 @@ end
 local c_red = Color(255, 0, 0, 255)
 local c_grn = Color(0, 255, 0, 255)
 
+local function SafeTextureID(path)
+	if not path then
+		return surface.GetTextureID("vgui/white")
+	end
+
+	local id = surface.GetTextureID(path)
+
+	if id == 0 then
+		id = surface.GetTextureID("no_material")
+	end
+
+	if id == 0 then
+		id = surface.GetTextureID("vgui/white")
+	end
+
+	return id
+end
+
 local function L(key)
 	if TFA and TFA.GetLangString then
 		return TFA.GetLangString(key)
@@ -284,7 +302,7 @@ local function hexpaint1(myself, w, h)
 	if not IsValid(myself.Wep) then return end
 
 	if not myself.iconmat then
-		myself.iconmat = surface.GetTextureID(myself.icon)
+		myself.iconmat = SafeTextureID(myself.icon)
 	end
 
 	local mys_isactive = myself.Wep.AttachmentCache[myself.attachment].active
@@ -305,7 +323,7 @@ local function hexpaint2(myself, w, h)
 	if not IsValid(myself.Wep) then return end
 
 	if not myself.iconmat then
-		myself.iconmat = surface.GetTextureID(myself.icon)
+		myself.iconmat = SafeTextureID(myself.icon)
 	end
 
 	local mys_isactive = true
@@ -396,11 +414,11 @@ function SWEP:GenerateInspectionDerma()
 			myself.ActiveColor = ColorAlpha(INSPECTION_ACTIVECOLOR, TFA_INSPECTIONPANEL.Alpha)
 
 			if not myself.SideBar then
-				myself.SideBar = surface.GetTextureID("vgui/inspectionhud/sidebar")
+				myself.SideBar = SafeTextureID("vgui/inspectionhud/sidebar")
 			end
 
 			if not myself.Hex then
-				myself.Hex = surface.GetTextureID("vgui/inspectionhud/hex")
+				myself.Hex = SafeTextureID("vgui/inspectionhud/hex")
 			end
 		end
 	end

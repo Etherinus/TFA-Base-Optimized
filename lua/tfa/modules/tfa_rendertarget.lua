@@ -21,10 +21,12 @@ if CLIENT then
     local GetViewEntity = GetViewEntity
     local LocalPlayer = LocalPlayer
     local IsValid = IsValid
+    local pairs = pairs
     local hook_Add = hook.Add
     local render_PushRenderTarget = render.PushRenderTarget
     local render_Clear = render.Clear
     local render_PopRenderTarget = render.PopRenderTarget
+    local render_RenderView = render.RenderView
 
     local props = {
         ["$translucent"] = 1
@@ -38,6 +40,86 @@ if CLIENT then
     local ply
     local vm
     local wep
+    local rtRenderData = {}
+
+    local function hasRTMaterial(elements)
+        if not elements then
+            return false
+        end
+
+        for _, v in pairs(elements) do
+            if istable(v) and v.material == "!tfa_rtmaterial" then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    local function weaponNeedsRT(wep)
+        if wep._TFA_RTNeedsDraw ~= nil then
+            return wep._TFA_RTNeedsDraw
+        end
+
+        local needs = wep.RTMaterialOverride ~= nil and wep.RTMaterialOverride ~= false
+        if not needs and wep.Scoped_3D then
+            needs = true
+        end
+
+        if not needs then
+            needs = hasRTMaterial(wep.VElements) or hasRTMaterial(wep.WElements)
+        end
+
+        wep._TFA_RTNeedsDraw = needs
+
+        return needs
+    end
+
+    local function ensureScopeFOV(wep)
+        local zoom = wep.Secondary and wep.Secondary.ScopeZoom
+
+        if zoom and zoom > 0 then
+            local target = 90 / zoom
+
+            if not wep.RTScopeFOV or math.abs(wep.RTScopeFOV - target) > 0.001 then
+                wep.RTScopeFOV = target
+            end
+        elseif not wep.RTScopeFOV or wep.RTScopeFOV <= 0 then
+            wep.RTScopeFOV = 10
+        end
+
+        return wep.RTScopeFOV
+    end
+
+    local function fallbackRTCode(self, rtMat, scrw, scrh)
+        if not self:OwnerIsValid() then
+            return
+        end
+
+        local owner = self:GetOwner()
+        if not IsValid(owner) then
+            return
+        end
+
+        ensureScopeFOV(self)
+
+        if self.IronSightsProgress and self.IronSightsProgress <= 0.01 then
+            render_Clear(0, 0, 0, 255, true, true)
+            return
+        end
+
+        rtRenderData.angles = owner:EyeAngles()
+        rtRenderData.origin = owner:GetShootPos()
+        rtRenderData.x = 0
+        rtRenderData.y = 0
+        rtRenderData.w = 512
+        rtRenderData.h = 512
+        rtRenderData.fov = self.RTScopeFOV
+        rtRenderData.drawviewmodel = false
+        rtRenderData.drawhud = false
+
+        render_RenderView(rtRenderData)
+    end
 
     function TFARefreshRT()
         if not TFA_RTScreen then
@@ -91,6 +173,7 @@ if CLIENT then
             end
 
             oldWep = wep
+            wep._TFA_RTNeedsDraw = nil
             RBP(vm)
             vm:SetSubMaterial()
             vm:SetSkin(0)
@@ -130,10 +213,19 @@ if CLIENT then
             end
         end
 
-        if not wep.RTMaterialOverride or not wep.RTCode then
+        if not weaponNeedsRT(wep) then
             TFA_RENDERSCREEN = false
             return
         end
+
+        local rtFunc = wep.RTCode
+
+        if not rtFunc and wep.BaseClass and isfunction(wep.BaseClass.RTCode) then
+            rtFunc = wep.BaseClass.RTCode
+        end
+
+        rtFunc = rtFunc or fallbackRTCode
+        ensureScopeFOV(wep)
 
         TFARefreshRT()
         oldVmModel = vm:GetModel()
@@ -143,11 +235,13 @@ if CLIENT then
 
         render_PushRenderTarget(TFA_RTScreen)
         render_Clear(0, 0, 0, 0, true, true)
-        wep:RTCode(TFA_RTMat, scw, sch)
+        rtFunc(wep, TFA_RTMat, scw, sch)
         render_PopRenderTarget()
 
         TFA_RTMat:SetTexture("$basetexture", TFA_RTScreen)
-        wep.Owner:GetViewModel():SetSubMaterial(wep.RTMaterialOverride, "!tfa_rtmaterial")
+        if wep.RTMaterialOverride and wep.RTMaterialOverride >= 0 then
+            wep.Owner:GetViewModel():SetSubMaterial(wep.RTMaterialOverride, "!tfa_rtmaterial")
+        end
 
         TFA_RENDERSCREEN = false
     end

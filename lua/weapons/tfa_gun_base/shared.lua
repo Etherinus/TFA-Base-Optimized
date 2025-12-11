@@ -787,16 +787,6 @@ function SWEP:Think2()
 	stat = self:GetStatus()
 	statend = self:GetStatusEnd()
 
-	if stat == TFA.Enum.STATUS_SHOOTING and (not self.Owner or not self.Owner:KeyDown(IN_ATTACK)) and ct > self:GetNextPrimaryFire() then
-		stat = TFA.Enum.STATUS_IDLE
-		self:SetStatus(stat)
-		self:SetStatusEnd(ct)
-		self:SetNextIdleAnim(-1)
-		if self.ChooseIdleAnim then
-			self:ChooseIdleAnim()
-		end
-	end
-
 	if stat ~= TFA.Enum.STATUS_IDLE and ct > statend then
 		finalstat = TFA.Enum.STATUS_IDLE
 
@@ -886,7 +876,9 @@ function SWEP:Think2()
 		end
 
 		if finalstat == TFA.Enum.STATUS_IDLE then
-			self:SetNextIdleAnim(-1)
+			if stat ~= TFA.Enum.STATUS_SHOOTING then
+				self:SetNextIdleAnim(-1)
+			end
 		end
 		self:SetStatus(finalstat)
 		self.LastBoltShoot = nil
@@ -901,6 +893,8 @@ function SWEP:Think2()
 			end
 		end
 	end
+
+	stat = self:GetStatus()
 
 	if self:GetShotgunCancel() and stat == TFA.Enum.STATUS_IDLE then
 		if self.PumpAction then
@@ -1181,14 +1175,20 @@ function SWEP:PrimaryAttack()
 		self:SetStatusEnd( l_CT() + (self.SequenceLengthOverride[ tanim ] or self:GetActivityLength(tanim,true)) )
 		return
 	end
-	self:SetNextPrimaryFire( CurTime() + self:GetFireDelay() )
+	local ct = l_CT()
+	self:SetNextPrimaryFire( ct + self:GetFireDelay() )
 	if self:GetMaxBurst() > 1 then
 		self:SetBurstCount( math.max(1,self:GetBurstCount() + 1) )
 	end
 	self:SetStatus(TFA.Enum.STATUS_SHOOTING)
-	self:SetStatusEnd(self:GetNextPrimaryFire())
 	self:ToggleAkimbo()
-	self:ChooseShootAnim()
+	local _, tanim = self:ChooseShootAnim()
+	local statusEnd = self:GetNextPrimaryFire()
+	local animLength = tanim and self:GetActivityLength(tanim, true) or 0
+	if animLength > 0 and self:GetMaxBurst() <= 1 and not self.PumpAction then
+		statusEnd = math.max(statusEnd, ct + animLength)
+	end
+	self:SetStatusEnd(statusEnd)
 	self.Owner:SetAnimation(PLAYER_ATTACK1)
 	if self.Primary.Sound and IsFirstTimePredicted()  and not ( sp and CLIENT ) then
 		if self.Primary.SilencedSound and self:GetSilenced() then
@@ -1391,6 +1391,7 @@ local centered_sprintpos = Vector(0,-1,1)
 local centered_sprintang = Vector(-15,0,0)
 
 function SWEP:CalculateViewModelOffset( )
+	ft = TFA.FrameTime()
 
 	if self.VMPos_Additive then
 		target_pos:Zero()
@@ -1557,6 +1558,8 @@ local vmfov
 
 function SWEP:GetViewModelPosition( pos, ang )
 	if not IsValid(self.Owner) then return end
+	-- Fallback to ensure offsets stay in sync when other hooks skip PlayerThinkCL
+	self:CalculateViewModelOffset()
 	--Bobscale
 	self.BobScaleCustom = l_Lerp(self.IronSightsProgress, 1, l_Lerp( math.min( self.Owner:GetVelocity():Length() / self.Owner:GetWalkSpeed(), 1 ), self.IronBobMult, self.IronBobMultWalk))
 	self.BobScaleCustom = l_Lerp(self.SprintProgress, self.BobScaleCustom, self.SprintBobMult)

@@ -52,6 +52,9 @@ local function loadFolder(folder)
     local basePath = "tfa/" .. folder .. "/"
     local flist = fileFind(basePath .. "*.lua", "LUA")
 
+    -- Make sure load order is deterministic so shared data files (e.g. caches before hooks) stay predictable
+    table.sort(flist)
+
     for i = 1, #flist do
         local filename = flist[i]
         local isClient = stringFind(filename, "cl_", 1, true) ~= nil
