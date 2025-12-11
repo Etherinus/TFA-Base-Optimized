@@ -223,6 +223,22 @@ if not wepMeta.GetActivityEnabled then
 	end
 end
 
+local dmgMeta = (debug.getregistry and debug.getregistry().CTakeDamageInfo) or FindMetaTable("CTakeDamageInfo")
+
+if dmgMeta then
+	if not dmgMeta.SetBaseDamage and dmgMeta.SetDamage then
+		function dmgMeta:SetBaseDamage(val)
+			return self:SetDamage(val)
+		end
+	end
+
+	if not dmgMeta.GetBaseDamage and dmgMeta.GetDamage then
+		function dmgMeta:GetBaseDamage()
+			return self:GetDamage()
+		end
+	end
+end
+
 if CLIENT then
 	local pendingCreates = {}
 

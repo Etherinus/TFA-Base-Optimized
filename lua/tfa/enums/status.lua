@@ -43,6 +43,8 @@ local statusList = {
     "shooting",
     "silencer_toggle",
     "bashing",
+    "blocking",
+    "blocking_end",
     "inspecting",
     "fidget",
     "pump",

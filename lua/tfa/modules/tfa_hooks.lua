@@ -10,10 +10,30 @@ local Lerp = Lerp
 local cachedPly
 local cachedWep
 
+local function TFAUpdateBlockingState(plyv, wep)
+    if not IsValid(wep) or not wep.IsTFAWeapon then
+        return
+    end
+
+    if not wep.CanBlock or not wep.SetBashImpulse or not wep.GetBashImpulse then
+        return
+    end
+
+    local shouldBlock = plyv:KeyDown(IN_ATTACK2)
+
+    if shouldBlock ~= wep:GetBashImpulse() then
+        wep:SetBashImpulse(shouldBlock)
+    end
+end
+
 hook.Add("PlayerTick", "PlayerTickTFA", function(plyv)
     local wep = plyv:GetActiveWeapon()
-    if IsValid(wep) and wep.PlayerThink then
-        wep:PlayerThink(plyv)
+    if IsValid(wep) then
+        if wep.PlayerThink then
+            wep:PlayerThink(plyv)
+        end
+
+        TFAUpdateBlockingState(plyv, wep)
     end
 end)
 
