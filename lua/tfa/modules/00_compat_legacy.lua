@@ -52,8 +52,14 @@ if not ScaleW then
     end
 end
 
+
 if CLIENT then
     if not ConVarExists("cl_tfa_changelog") then
         CreateClientConVar("cl_tfa_changelog", "0", true, false)
     end
+end
+
+TFA.Effects = TFA.Effects or {}
+function TFA.Effects.Create(name, data)
+    util.Effect(name, data)
 end

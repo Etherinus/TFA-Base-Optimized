@@ -523,6 +523,11 @@ function SWEP:Initialize()
 	self.DTapActivities = self.DTapActivities or {}
 	self.Animations = self.Animations or {}
 	self.Primary_TFA = self.Primary_TFA or table.Copy(self.Primary or {})
+	if self.Primary.Projectile then
+		self.ProjectileEntity = self.Primary.Projectile
+		self.ProjectileVelocity = self.Primary.ProjectileVelocity or 0
+		self.ProjectileModel = self.Primary.ProjectileModel
+	end
 	self.Secondary_TFA = self.Secondary_TFA or table.Copy(self.Secondary or {})
 	self.GetIronSightsProgress = self.GetIronSightsProgress or self.GetIronSights
 	self.BobScaleCustom = 1
@@ -1228,7 +1233,7 @@ function SWEP:Reload(released)
 	if not self:VMIV() then return end
 	if self:Ammo1() <= 0 then return end
 	if self.Primary.ClipSize < 0 then return end
-	if ( not released ) and ( not legacy_reloads_cv:GetBool() ) then return end
+	-- if ( not released ) and ( not legacy_reloads_cv:GetBool() ) then return end
 	if legacy_reloads_cv:GetBool() and not  dryfire_cvar:GetBool() and not self.Owner:KeyDown(IN_RELOAD) then return end
 	if self.Owner:KeyDown(IN_USE) then return end
 
@@ -1631,4 +1636,22 @@ end
 function SWEP:ToggleInspect()
 	if self:GetSprinting() or self:GetIronSights() or self:GetStatus() ~= TFA.Enum.STATUS_IDLE then return end
 	self.Inspecting = not self.Inspecting
+end
+function SWEP:GetWalking()
+	if not self:OwnerIsValid() then return false end
+	local ply = self:GetOwner()
+	if not ply:IsPlayer() then return false end
+	return ply:KeyDown(IN_WALK) or ply:GetVelocity():Length2D() <= ply:GetWalkSpeed() and ply:GetVelocity():Length2D() > 1
+end
+
+function SWEP:ChooseAnimation(anim)
+	if not self.BaseAnimations[anim] then return end
+	local data = self.BaseAnimations[anim]
+	local typev = data.type
+	local val = data.value
+	if typev == TFA.Enum.ANIMATION_SEQ then
+		return typev, val
+	else
+		return typev, val
+	end
 end

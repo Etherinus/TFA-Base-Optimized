@@ -30,6 +30,7 @@ SWEP.Callback = {}
 function SWEP:Deploy()
 	self.StabIndex = math.random(1, #self.SlashTable)
 	self.StabMiss = math.random(1, #self.SlashTable)
+	self.SlashCounter = 1
 	return BaseClass.Deploy(self)
 end
 
@@ -269,3 +270,14 @@ end
 
 SWEP.IsKnife = true
 SWEP.WeaponLength = 8
+
+function SWEP:CanAttack()
+	if self:GetNextPrimaryFire() > CurTime() then return false end
+    if self:GetStatus() == TFA.Enum.STATUS_RELOADING then return false end
+	return true
+end
+function SWEP:GetSlashTrace(tracedata, fw)
+	tracedata.mins = Vector(-10, -5, 0)
+	tracedata.maxs = Vector(10, 5, 5)
+	return util.TraceHull(tracedata)
+end
