@@ -1,4 +1,5 @@
 TFA = TFA or {}
+TFA.DegreesToAccuracy = TFA.DegreesToAccuracy or (math.pi / 180)
 
 local tmpsp = game.SinglePlayer()
 

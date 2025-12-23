@@ -465,6 +465,15 @@ function SWEP:ChooseSprintAnim()
 	return true,-1
 end
 
+function SWEP:ChooseWalkAnim()
+	if self.WalkAnimation and self.WalkAnimation.loop then
+		self:PlayAnimation(self.WalkAnimation.loop)
+		return true,-1
+	end
+
+	return self:ChooseFlatAnim()
+end
+
 --[[
 Function Name:  ChooseShootAnim
 Syntax: self:ChooseShootAnim().

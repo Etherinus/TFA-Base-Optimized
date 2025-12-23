@@ -1644,14 +1644,56 @@ function SWEP:GetWalking()
 	return ply:KeyDown(IN_WALK) or ply:GetVelocity():Length2D() <= ply:GetWalkSpeed() and ply:GetVelocity():Length2D() > 1
 end
 
+function SWEP:IsJammed()
+	return false
+end
+
+function SWEP:UpdateJamFactor()
+end
+
+function SWEP:RollJamChance()
+end
+
+local tfa_default_animations = {
+	draw = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_DRAW },
+	draw_empty = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_DRAW_EMPTY or ACT_VM_DRAW },
+	draw_silenced = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_DRAW_SILENCED or ACT_VM_DRAW },
+	draw_first = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_DRAW_DEPLOYED or ACT_VM_DRAW },
+	idle = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_IDLE },
+	idle_empty = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_IDLE_EMPTY or ACT_VM_IDLE },
+	idle_silenced = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_IDLE_SILENCED or ACT_VM_IDLE },
+	holster = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_HOLSTER },
+	holster_empty = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_HOLSTER_EMPTY or ACT_VM_HOLSTER },
+	holster_silenced = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_HOLSTER_SILENCED or ACT_VM_HOLSTER },
+	reload = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_RELOAD },
+	reload_empty = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_RELOAD_EMPTY or ACT_VM_RELOAD },
+	reload_silenced = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_RELOAD_SILENCED or ACT_VM_RELOAD },
+	shoot1 = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_PRIMARYATTACK },
+	shoot1_is = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_PRIMARYATTACK_1 or ACT_VM_PRIMARYATTACK },
+	shoot1_empty = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_PRIMARYATTACK_EMPTY or ACT_VM_PRIMARYATTACK },
+	shoot1_last = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_PRIMARYATTACK_EMPTY or ACT_VM_PRIMARYATTACK },
+	shoot1_silenced = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_PRIMARYATTACK_SILENCED or ACT_VM_PRIMARYATTACK },
+	shoot2 = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_SECONDARYATTACK or ACT_VM_PRIMARYATTACK },
+	inspect = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_FIDGET },
+	inspect_empty = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_FIDGET_EMPTY or ACT_VM_FIDGET },
+	inspect_silenced = { type = TFA.Enum.ANIMATION_ACT, value = ACT_VM_FIDGET }
+}
+
 function SWEP:ChooseAnimation(anim)
-	if not self.BaseAnimations[anim] then return end
-	local data = self.BaseAnimations[anim]
-	local typev = data.type
-	local val = data.value
-	if typev == TFA.Enum.ANIMATION_SEQ then
-		return typev, val
-	else
-		return typev, val
+	local data
+	local baseAnims = self.BaseAnimations
+	if baseAnims then
+		data = baseAnims[anim]
 	end
+	if not data then
+		local anims = self.Animations
+		if anims then
+			data = anims[anim]
+		end
+	end
+	if not data then
+		data = tfa_default_animations[anim]
+	end
+	if not data then return end
+	return data.type, data.value
 end

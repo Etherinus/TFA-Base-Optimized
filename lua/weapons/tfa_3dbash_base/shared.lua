@@ -1,4 +1,5 @@
-DEFINE_BASECLASS("tfa_bash_base")
+SWEP.Base = "tfa_bash_base"
+DEFINE_BASECLASS(SWEP.Base)
 SWEP.Secondary.ScopeZoom = 1
 SWEP.Secondary.UseACOG = false
 SWEP.Secondary.UseMilDot = false

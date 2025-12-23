@@ -1,4 +1,5 @@
-DEFINE_BASECLASS("tfa_gun_base")
+SWEP.Base = "tfa_gun_base"
+DEFINE_BASECLASS(SWEP.Base)
 SWEP.Secondary.BashDamage = 25
 SWEP.Secondary.BashSound = Sound("TFA.Bash")
 SWEP.Secondary.BashHitSound = Sound("TFA.BashWall")

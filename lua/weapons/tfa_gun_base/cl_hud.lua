@@ -248,6 +248,7 @@ local function sourcetofeet(u)
 end
 
 local pad = 4
+local sidebar_width = 16
 local infotextpad = "  "
 local INSPECTION_BACKGROUND = Color(15, 15, 15, 64)
 local INSPECTION_ACTIVECOLOR = Color(255, 147, 4, 255)
@@ -430,19 +431,19 @@ function SWEP:GenerateInspectionDerma()
 	local screenwidth, screenheight = ScrW(), ScrH()
 	local hv = math.Round(screenheight * 0.8)
 	local contentpanel = vgui.Create("DPanel", TFA_INSPECTIONPANEL)
-	contentpanel:SetPos(32, (screenheight - hv) / 2)
-	contentpanel:DockPadding(32 + pad, pad, pad, pad)
-	contentpanel:SetSize(screenwidth - 32, hv)
+	contentpanel:SetPos(sidebar_width, (screenheight - hv) / 2)
+	contentpanel:DockPadding(sidebar_width + pad, pad, pad, pad)
+	contentpanel:SetSize(screenwidth - sidebar_width, hv)
 
 	contentpanel.Paint = function(myself, w, h)
 		local mycol = TFA_INSPECTIONPANEL.SecondaryColor
 		if not mycol then return end
 		surface.SetDrawColor(mycol)
 		surface.SetTexture(TFA_INSPECTIONPANEL.SideBar or 1)
-		surface.DrawTexturedRect(0, 0, 32, h)
+		surface.DrawTexturedRect(0, 0, sidebar_width, h)
 	end
 
-	local lbound = 32 + pad
+	local lbound = sidebar_width + pad
 	local titletext = contentpanel:Add("DPanel")
 	titletext.Text = self.PrintName or "TFA Weapon"
 

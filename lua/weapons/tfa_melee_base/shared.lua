@@ -1,4 +1,5 @@
-DEFINE_BASECLASS("tfa_bash_base")
+SWEP.Base = "tfa_bash_base"
+DEFINE_BASECLASS(SWEP.Base)
 SWEP.DrawCrosshair = false
 SWEP.SlotPos = 72
 SWEP.Slot = 0

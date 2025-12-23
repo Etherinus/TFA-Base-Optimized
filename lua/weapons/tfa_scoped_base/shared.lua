@@ -1,4 +1,5 @@
-DEFINE_BASECLASS("tfa_gun_base")
+SWEP.Base = "tfa_gun_base"
+DEFINE_BASECLASS(SWEP.Base)
 SWEP.Secondary.ScopeZoom = 0
 SWEP.Secondary.UseACOG = false
 SWEP.Secondary.UseMilDot = false
