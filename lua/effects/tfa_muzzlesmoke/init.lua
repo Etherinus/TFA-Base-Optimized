@@ -1,60 +1,49 @@
-local AddVel = Vector()
-local ang
+local IsValid = IsValid
+local LocalPlayer = LocalPlayer
 
 function EFFECT:Init(data)
-	self.WeaponEnt = data:GetEntity()
-	if not IsValid(self.WeaponEnt) then return end
-	self.Attachment = data:GetAttachment()
+	local wep = data:GetEntity()
+	if not IsValid(wep) then return end
+
+	local att = data:GetAttachment()
+
 	local smokepart = "smoke_trail"
-
-	if self.WeaponEnt.SmokeParticles then
-		smokepart = self.WeaponEnt.SmokeParticles[self.WeaponEnt.DefaultHoldType or self.WeaponEnt.HoldType] or smokepart
+	if wep.SmokeParticles then
+		local key = wep.DefaultHoldType or wep.HoldType
+		smokepart = wep.SmokeParticles[key] or smokepart
 	end
 
-	if self.WeaponEnt.SmokeParticles then
-		smokepart = self.WeaponEnt.SmokeParticles[self.WeaponEnt.DefaultHoldType or self.WeaponEnt.HoldType] or smokepart
-	end
+	if not smokepart or smokepart == "" then return end
+	if TFA.HasParticleSystem and not TFA.HasParticleSystem(smokepart) then return end
 
-	if not smokepart or smokepart == "" or (TFA.HasParticleSystem and not TFA.HasParticleSystem(smokepart)) then
-		return
-	end
+	local pos = self:GetTracerShootPos(data:GetOrigin(), wep, att)
 
-	self.Position = self:GetTracerShootPos(data:GetOrigin(), self.WeaponEnt, self.Attachment)
+	local owner = wep.Owner
+	local forward
 
-	if IsValid(self.WeaponEnt.Owner) then
-		if self.WeaponEnt.Owner == LocalPlayer() then
-			if self.WeaponEnt.Owner:ShouldDrawLocalPlayer() then
-				ang = self.WeaponEnt.Owner:EyeAngles()
+	if IsValid(owner) then
+		if owner == LocalPlayer() then
+			if owner:ShouldDrawLocalPlayer() then
+				local ang = owner:EyeAngles()
 				ang:Normalize()
-				--ang.p = math.max(math.min(ang.p,55),-55)
-				self.Forward = ang:Forward()
+				forward = ang:Forward()
 			else
-				self.WeaponEnt = self.WeaponEnt.Owner:GetViewModel()
+				local vm = owner:GetViewModel()
+				if IsValid(vm) then
+					wep = vm
+				end
 			end
-			--ang.p = math.max(math.min(ang.p,55),-55)
 		else
-			ang = self.WeaponEnt.Owner:EyeAngles()
+			local ang = owner:EyeAngles()
 			ang:Normalize()
-			self.Forward = ang:Forward()
+			forward = ang:Forward()
 		end
 	end
 
-	self.Forward = self.Forward or data:GetNormal()
-	self.Angle = self.Forward:Angle()
-	self.Right = self.Angle:Right()
-	self.vOffset = self.Position
-	dir = self.Forward
+	forward = forward or data:GetNormal()
 
-	if IsValid(LocalPlayer()) then
-		AddVel = LocalPlayer():GetVelocity()
-	end
-
-	self.vOffset = self.Position
-	dir = self.Forward
-	AddVel = AddVel * 0.05
-
-	if TFA.GetMZSmokeEnabled == nil or TFA.GetMZSmokeEnabled() then
-		ParticleEffectAttach(smokepart, PATTACH_POINT_FOLLOW, self.WeaponEnt, self.Attachment)
+	if (not TFA.GetMZSmokeEnabled) or TFA.GetMZSmokeEnabled() then
+		ParticleEffectAttach(smokepart, PATTACH_POINT_FOLLOW, wep, att)
 	end
 end
 

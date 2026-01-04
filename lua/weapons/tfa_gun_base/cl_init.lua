@@ -1,25 +1,27 @@
---[[ Load up our shared code. ]]--
+include("shared.lua")
 
-include('shared.lua')
+local function IterateModuleList(t, fn)
+	if not istable(t) then return end
 
---[[ Include these modules, because they're clientside.]]--
-
-if CLIENT then
-	for k,v in pairs(SWEP.ClSIDE_MODULES) do
-		include(v)
+	if #t > 0 then
+		for i = 1, #t do
+			local v = t[i]
+			if isstring(v) and v ~= "" then
+				fn(v)
+			end
+		end
+	else
+		for _, v in pairs(t) do
+			if isstring(v) and v ~= "" then
+				fn(v)
+			end
+		end
 	end
 end
 
---[[ Include these modules, because they're shared.]]--
+IterateModuleList(SWEP.ClSIDE_MODULES, include)
+IterateModuleList(SWEP.SH_MODULES, include)
 
-if CLIENT then
-	for k,v in pairs(SWEP.SH_MODULES) do
-		include(v)
-	end
-end
-
---[[Actual clientside values]]--
-
-SWEP.DrawAmmo				= true				--Should draw the default HL2 ammo counter
-SWEP.DrawWeaponInfoBox			= false				-- Should draw the weapon info box
-SWEP.BounceWeaponIcon   			= false				-- Should the weapon icon bounce?
+SWEP.DrawAmmo = true
+SWEP.DrawWeaponInfoBox = false
+SWEP.BounceWeaponIcon = false

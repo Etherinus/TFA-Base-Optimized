@@ -2,7 +2,7 @@ local pairs = pairs
 local ipairs = ipairs
 local istable = istable
 local isfunction = isfunction
-local type = type
+local typeFn = type
 local weapons = weapons
 local table_Copy = table.Copy
 local pcall = pcall
@@ -23,46 +23,14 @@ local ForceAttachment = {
 local attachmentCorrectionsPre = {}
 
 local attachmentCorrections = {
-    ins2_si_eotech = {
-        VElements = {
-            sight_eotech = { active = true }
-        }
-    },
-    ins2_si_kobra = {
-        VElements = {
-            sight_kobra = { active = true }
-        }
-    },
-    ins2_si_rds = {
-        VElements = {
-            sight_rds = { active = true }
-        }
-    },
-    ins2_si_2xrds = {
-        VElements = {
-            scope_2xrds = { active = true }
-        }
-    },
-    ins2_si_c79 = {
-        VElements = {
-            scope_c79 = { active = true }
-        }
-    },
-    ins2_si_po4x = {
-        VElements = {
-            scope_po4x = { active = true }
-        }
-    },
-    ins2_si_mx4 = {
-        VElements = {
-            scope_mx4 = { active = true }
-        }
-    },
-    ins2_si_mosin = {
-        VElements = {
-            scope_mosin = { active = true }
-        }
-    }
+    ins2_si_eotech = { VElements = { sight_eotech = { active = true } } },
+    ins2_si_kobra = { VElements = { sight_kobra = { active = true } } },
+    ins2_si_rds = { VElements = { sight_rds = { active = true } } },
+    ins2_si_2xrds = { VElements = { scope_2xrds = { active = true } } },
+    ins2_si_c79 = { VElements = { scope_c79 = { active = true } } },
+    ins2_si_po4x = { VElements = { scope_po4x = { active = true } } },
+    ins2_si_mx4 = { VElements = { scope_mx4 = { active = true } } },
+    ins2_si_mosin = { VElements = { scope_mosin = { active = true } } }
 }
 
 local defaultValue = {
@@ -75,18 +43,19 @@ function TFA.INS2.AnimateSight()
 end
 
 local function ApplyWeaponTableRecursive(source, target, wep)
-    if not source or not target then
-        return
-    end
+    if not source or not target then return end
 
     for k, v in pairs(source) do
         if istable(v) then
-            target[k] = target[k] or {}
-            ApplyWeaponTableRecursive(v, target[k], wep)
-        else
-            if target[k] == nil then
-                target[k] = v
-            elseif type(target[k]) == type(v) then
+            local tv = target[k]
+            if not istable(tv) then
+                tv = {}
+                target[k] = tv
+            end
+            ApplyWeaponTableRecursive(v, tv, wep)
+        elseif not isfunction(v) then
+            local tv = target[k]
+            if tv == nil or typeFn(tv) == typeFn(v) then
                 target[k] = v
             end
         end
@@ -95,8 +64,8 @@ local function ApplyWeaponTableRecursive(source, target, wep)
     for k, v in pairs(source) do
         if isfunction(v) then
             local ent = wep or target
-            local succ, val = pcall(v, ent, target[k] or defaultValue[k])
-            if succ and type(val) ~= "function" then
+            local ok, val = pcall(v, ent, target[k] or defaultValue[k])
+            if ok and typeFn(val) ~= "function" then
                 target[k] = val
             end
         end
@@ -104,71 +73,82 @@ local function ApplyWeaponTableRecursive(source, target, wep)
 end
 
 function TFAApplyAttachment(attName, wep)
-    if not attName or not wep then
-        return
+    if not attName or not wep then return end
+
+    local atts = TFA.Attachments and TFA.Attachments.Atts
+    if not atts then return end
+
+    local attachment = atts[attName]
+    if not attachment then return end
+
+    local pre = attachmentCorrectionsPre[attName]
+    if pre then
+        ApplyWeaponTableRecursive(pre, wep, wep)
     end
 
-    local attachment = TFA.Attachments.Atts[attName]
-    if not attachment then
-        return
+    local attachFn = attachment.Attach
+    if attachFn then
+        local copy = table_Copy and table_Copy(attachment) or attachment
+        attachFn(copy, wep)
     end
 
-    ApplyWeaponTableRecursive(attachmentCorrectionsPre[attName], wep, wep)
-
-    if attachment.Attach then
-        attachment.Attach(table_Copy(attachment), wep)
+    local wt = attachment.WeaponTable
+    if wt then
+        ApplyWeaponTableRecursive(wt, wep, wep)
     end
 
-    ApplyWeaponTableRecursive(attachment.WeaponTable, wep, wep)
-    ApplyWeaponTableRecursive(attachmentCorrections[attName], wep, wep)
+    local post = attachmentCorrections[attName]
+    if post then
+        ApplyWeaponTableRecursive(post, wep, wep)
+    end
 end
 
 function TFASelectAttachment(wepClass, attachments)
-    if not attachments or not attachments.atts then
-        return
-    end
+    if not attachments or not attachments.atts then return end
 
     local atts = attachments.atts
+    local indexByName = {}
+
+    for i = 1, #atts do
+        indexByName[atts[i]] = i
+    end
+
+    local sel
 
     for i = 1, #defaultScopes do
-        local scopeName = defaultScopes[i]
-        local found = false
-
-        for selIndex, attName in pairs(atts) do
-            if attName == scopeName then
-                found = true
-                attachments.sel = selIndex
-                break
-            end
-        end
-
-        if found then
+        local idx = indexByName[defaultScopes[i]]
+        if idx then
+            sel = idx
             break
         end
     end
 
-    for selIndex, attName in pairs(atts) do
-        if ForceAttachment[wepClass] == attName then
-            attachments.sel = selIndex
+    local forced = ForceAttachment[wepClass]
+    if forced then
+        local idx = indexByName[forced]
+        if idx then
+            sel = idx
         end
+    end
+
+    if sel then
+        attachments.sel = sel
     end
 end
 
 function TFAApplyAttachmentOuter(wep)
-    if not wep or not wep.Attachments then
-        return
-    end
+    if not wep or not wep.Attachments then return end
 
     local className = wep.ClassName or ""
-    if not weapons.IsBasedOn(className, "tfa_gun_base") then
-        return
-    end
+    if not weapons.IsBasedOn(className, "tfa_gun_base") then return end
 
     for _, attachmentSlot in pairs(wep.Attachments) do
         TFASelectAttachment(className, attachmentSlot)
 
-        if attachmentSlot.sel and attachmentSlot.atts and attachmentSlot.sel >= 0 then
-            local attName = attachmentSlot.atts[attachmentSlot.sel]
+        local sel = attachmentSlot.sel
+        local atts = attachmentSlot.atts
+        if sel and atts and sel >= 1 then
+            local attName = atts[sel]
             if attName then
                 TFAApplyAttachment(attName, wep)
             end

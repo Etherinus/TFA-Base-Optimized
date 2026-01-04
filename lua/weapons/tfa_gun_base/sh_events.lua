@@ -1,11 +1,6 @@
 local sp = game.SinglePlayer()
 local l_CT = CurTime
---[[
-Function Name:  ResetEvents
-Syntax: self:ResetEvents()
-Returns:  Nothing.
-Purpose:  Cleans up events table.
-]]--
+
 function SWEP:ResetEvents()
 	if not self:OwnerIsValid() then return end
 
@@ -15,28 +10,40 @@ function SWEP:ResetEvents()
 
 	self.EventTimer = l_CT()
 
-	for k, v in pairs(self.EventTable) do
-		for l, b in pairs(v) do
-			b.called = false
+	local et = self.EventTable
+	if not istable(et) then return end
+
+	for _, v in pairs(et) do
+		if istable(v) then
+			for __, b in pairs(v) do
+				if istable(b) then
+					b.called = false
+				end
+			end
 		end
 	end
 end
 
---[[
-Function Name:  ProcessEvents
-Syntax: self:ProcessEvents( ).
-Returns:  Nothing.
-Notes: Critical for the event table to function.
-Purpose:  Main SWEP function
-]]--
 function SWEP:ProcessEvents()
 	if not self:VMIV() then return end
 
-	local evtbl = self.EventTable[ self:GetLastActivity() ]
+	local et = self.EventTable
+	if not istable(et) then return end
 
-	if not evtbl then return end
-	for k, v in pairs(evtbl) do
-		if v.called or l_CT() < self.EventTimer + v.time then continue end
+	local act = self:GetLastActivity()
+	local evtbl = et[act]
+	if not istable(evtbl) then return end
+
+	local now = l_CT()
+	local evtt = self.EventTimer or now
+
+	for _, v in pairs(evtbl) do
+		if not istable(v) then continue end
+		if v.called then continue end
+
+		local t = tonumber(v.time) or 0
+		if now < evtt + t then continue end
+
 		v.called = true
 
 		if v.client == nil then
@@ -48,30 +55,46 @@ function SWEP:ProcessEvents()
 				v.server = true
 			end
 
-			if (v.client and CLIENT and (not v.client_predictedonly or self.Owner == LocalPlayer())) or (v.server and SERVER) and v.value then
-				v.value(self, self.OwnerViewModel)
+			local fn = v.value
+			if not fn then continue end
+
+			local allowClient = v.client and CLIENT and (not v.client_predictedonly or self:GetOwner() == LocalPlayer())
+			local allowServer = v.server and SERVER
+
+			if allowClient or allowServer then
+				fn(self, self.OwnerViewModel)
 			end
 		elseif v.type == "snd" or v.type == "sound" then
 			if v.server == nil then
 				v.server = false
 			end
 
+			local s = v.value
+			if not s or s == "" then continue end
+
 			if SERVER then
 				if v.client then
 					net.Start("tfaSoundEvent")
 					net.WriteEntity(self)
-					net.WriteString(v.value or "")
+					net.WriteString(s)
 
 					if sp then
 						net.Broadcast()
 					else
-						net.SendOmit(self.Owner)
+						local owner = self:GetOwner()
+						if IsValid(owner) then
+							net.SendOmit(owner)
+						else
+							net.Broadcast()
+						end
 					end
-				elseif v.server and v.value and v.value ~= "" then
-					self:EmitSound(v.value)
+				elseif v.server then
+					self:EmitSound(s)
 				end
-			elseif v.client and self.Owner == LocalPlayer() and not sp and v.value and v.value ~= "" then
-				self:EmitSound(v.value)
+			else
+				if v.client and self:GetOwner() == LocalPlayer() and not sp then
+					self:EmitSound(s)
+				end
 			end
 		end
 	end

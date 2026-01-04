@@ -13,15 +13,14 @@ local color_white = color_white
 local cv_dbc
 
 hook.Add("HUDPaint", "tfa_debugcrosshair", function()
-    cv_dbc = cv_dbc or GetConVar("cl_tfa_debugcrosshair")
-    if not cv_dbc or not cv_dbc:GetBool() then
-        return
+    if not cv_dbc then
+        cv_dbc = GetConVar("cl_tfa_debugcrosshair")
     end
 
+    if not cv_dbc or not cv_dbc:GetBool() then return end
+
     local lp = LocalPlayer()
-    if not IsValid(lp) or not lp:IsAdmin() then
-        return
-    end
+    if not IsValid(lp) or not lp:IsAdmin() then return end
 
     local w = ScrW()
     local h = ScrH()

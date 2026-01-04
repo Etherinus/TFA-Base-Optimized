@@ -1,22 +1,47 @@
 if CLIENT then
-    local spawnmenu_AddToolMenuOption = spawnmenu.AddToolMenuOption
-    local spawnmenu_RebuildToolMenu = spawnmenu.RebuildToolMenu
-    local hook_Add = hook.Add
-    local cvars_AddChangeCallback = cvars.AddChangeCallback
+    local spawnmenu_AddToolMenuOption = spawnmenu and spawnmenu.AddToolMenuOption
+    local spawnmenu_RebuildToolMenu = spawnmenu and spawnmenu.RebuildToolMenu
+    local hook_Add = hook and hook.Add
+    local cvars_AddChangeCallback = cvars and cvars.AddChangeCallback
     local RunConsoleCommand = RunConsoleCommand
     local GetConVar = GetConVar
-    local timer_Simple = timer.Simple
+    local timer_Simple = timer and timer.Simple
+    local ipairs = ipairs
+    local tostring = tostring
+
+    if not (spawnmenu_AddToolMenuOption and hook_Add) then
+        return
+    end
 
     local function L(key)
         if TFA and TFA.GetLangString then
             return TFA.GetLangString(key)
         end
-
         return key
     end
 
     local function addFooter(panel)
+        if not panel or not panel.AddControl then
+            return
+        end
         panel:AddControl("Label", { Text = L("ui_footer") })
+    end
+
+    local function addCheck(panel, labelKey, cvar)
+        panel:AddControl("CheckBox", {
+            Label = L(labelKey),
+            Command = cvar
+        })
+    end
+
+    local function addSlider(panel, labelKey, cvar, kind, minv, maxv)
+        panel:AddControl("Slider", {
+            Label = L(labelKey),
+            Command = cvar,
+            Type = kind,
+            Min = tostring(minv),
+            Max = tostring(maxv)
+        })
     end
 
     local function tfaOptionServer(panel)
@@ -50,106 +75,23 @@ if CLIENT then
 
         panel:AddControl("ComboBox", tfaOptionSV)
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_allow_dryfire"),
-            Command = "sv_tfa_allow_dryfire"
-        })
+        addCheck(panel, "ui_sv_allow_dryfire", "sv_tfa_allow_dryfire")
+        addCheck(panel, "ui_sv_dynamicaccuracy", "sv_tfa_dynamicaccuracy")
+        addCheck(panel, "ui_sv_weapon_strip", "sv_tfa_weapon_strip")
+        addCheck(panel, "ui_sv_ironsights_enabled", "sv_tfa_ironsights_enabled")
+        addCheck(panel, "ui_sv_sprint_enabled", "sv_tfa_sprint_enabled")
+        addCheck(panel, "ui_sv_cmenu", "sv_tfa_cmenu")
+        addCheck(panel, "ui_sv_bullet_penetration", "sv_tfa_bullet_penetration")
+        addCheck(panel, "ui_sv_reloads_enabled", "sv_tfa_reloads_enabled")
+        addCheck(panel, "ui_sv_reloads_legacy", "sv_tfa_reloads_legacy")
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_dynamicaccuracy"),
-            Command = "sv_tfa_dynamicaccuracy"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_weapon_strip"),
-            Command = "sv_tfa_weapon_strip"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_ironsights_enabled"),
-            Command = "sv_tfa_ironsights_enabled"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_sprint_enabled"),
-            Command = "sv_tfa_sprint_enabled"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_cmenu"),
-            Command = "sv_tfa_cmenu"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_bullet_penetration"),
-            Command = "sv_tfa_bullet_penetration"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_reloads_enabled"),
-            Command = "sv_tfa_reloads_enabled"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_reloads_legacy"),
-            Command = "sv_tfa_reloads_legacy"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_damage_multiplier"),
-            Command = "sv_tfa_damage_multiplier",
-            Type = "Float",
-            Min = "0",
-            Max = "5"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_door_respawn"),
-            Command = "sv_tfa_door_respawn",
-            Type = "Integer",
-            Min = "-1",
-            Max = "120"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_force_multiplier"),
-            Command = "sv_tfa_force_multiplier",
-            Type = "Float",
-            Min = "0",
-            Max = "5"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_spread_multiplier"),
-            Command = "sv_tfa_spread_multiplier",
-            Type = "Float",
-            Min = "0",
-            Max = "5"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_penetration_limit"),
-            Command = "sv_tfa_penetration_limit",
-            Type = "Integer",
-            Min = "0",
-            Max = "5"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_default_clip"),
-            Command = "sv_tfa_default_clip",
-            Type = "Integer",
-            Min = "-1",
-            Max = "10"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_range_modifier"),
-            Command = "sv_tfa_range_modifier",
-            Type = "Float",
-            Min = "0",
-            Max = "1"
-        })
+        addSlider(panel, "ui_sv_damage_multiplier", "sv_tfa_damage_multiplier", "Float", 0, 5)
+        addSlider(panel, "ui_sv_door_respawn", "sv_tfa_door_respawn", "Integer", -1, 120)
+        addSlider(panel, "ui_sv_force_multiplier", "sv_tfa_force_multiplier", "Float", 0, 5)
+        addSlider(panel, "ui_sv_spread_multiplier", "sv_tfa_spread_multiplier", "Float", 0, 5)
+        addSlider(panel, "ui_sv_penetration_limit", "sv_tfa_penetration_limit", "Integer", 0, 5)
+        addSlider(panel, "ui_sv_default_clip", "sv_tfa_default_clip", "Integer", -1, 10)
+        addSlider(panel, "ui_sv_range_modifier", "sv_tfa_range_modifier", "Float", 0, 1)
 
         addFooter(panel)
     end
@@ -167,7 +109,7 @@ if CLIENT then
             cl_tfa_forcearms = "0",
             cl_tfa_3dscope = "1",
             cl_tfa_3dscope_overlay = "0",
-            cl_tfa_scope_sensitivity_autoscale = "1",
+            cl_tfa_scope_sensitivity_autoscale = "100",
             cl_tfa_scope_sensitivity = "100",
             cl_tfa_inspection_ckey = "0",
             cl_tfa_inspection_old = "0",
@@ -175,8 +117,8 @@ if CLIENT then
             cl_tfa_ironsights_resight = "1",
             cl_tfa_viewbob_reloading = "1",
             cl_tfa_viewbob_drawing = "0",
-            sv_tfa_gunbob_intensity = "1",
-            sv_tfa_viewbob_intensity = "1",
+            cl_tfa_gunbob_intensity = "1",
+            cl_tfa_viewbob_intensity = "1",
             cl_tfa_viewmodel_offset_x = "0",
             cl_tfa_viewmodel_offset_y = "0",
             cl_tfa_viewmodel_offset_z = "0",
@@ -187,121 +129,28 @@ if CLIENT then
 
         panel:AddControl("ComboBox", tfaOptionCL)
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_forcearms"),
-            Command = "cl_tfa_forcearms"
-        })
+        addCheck(panel, "ui_cl_forcearms", "cl_tfa_forcearms")
+        addCheck(panel, "ui_cl_3dscope", "cl_tfa_3dscope")
+        addCheck(panel, "ui_cl_3dscope_overlay", "cl_tfa_3dscope_overlay")
+        addCheck(panel, "ui_cl_viewbob_drawing", "cl_tfa_viewbob_drawing")
+        addCheck(panel, "ui_cl_viewbob_reloading", "cl_tfa_viewbob_reloading")
+        addCheck(panel, "ui_cl_inspection_ckey", "cl_tfa_inspection_ckey")
+        addCheck(panel, "ui_cl_inspection_old", "cl_tfa_inspection_old")
+        addCheck(panel, "ui_cl_ironsights_toggle", "cl_tfa_ironsights_toggle")
+        addCheck(panel, "ui_cl_ironsights_resight", "cl_tfa_ironsights_resight")
+        addCheck(panel, "ui_cl_scope_sensitivity_autoscale", "cl_tfa_scope_sensitivity_autoscale")
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_3dscope"),
-            Command = "cl_tfa_3dscope"
-        })
+        addSlider(panel, "ui_cl_scope_sensitivity", "cl_tfa_scope_sensitivity", "Integer", 1, 100)
+        addSlider(panel, "ui_cl_gunbob_intensity", "cl_tfa_gunbob_intensity", "Float", 0, 2)
+        addSlider(panel, "ui_cl_viewbob_intensity", "cl_tfa_viewbob_intensity", "Float", 0, 2)
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_3dscope_overlay"),
-            Command = "cl_tfa_3dscope_overlay"
-        })
+        addSlider(panel, "ui_cl_viewmodel_offset_x", "cl_tfa_viewmodel_offset_x", "Float", -2, 2)
+        addSlider(panel, "ui_cl_viewmodel_offset_y", "cl_tfa_viewmodel_offset_y", "Float", -2, 2)
+        addSlider(panel, "ui_cl_viewmodel_offset_z", "cl_tfa_viewmodel_offset_z", "Float", -2, 2)
+        addSlider(panel, "ui_cl_viewmodel_offset_fov", "cl_tfa_viewmodel_offset_fov", "Float", -5, 5)
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_viewbob_drawing"),
-            Command = "cl_tfa_viewbob_drawing"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_viewbob_reloading"),
-            Command = "cl_tfa_viewbob_reloading"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_inspection_ckey"),
-            Command = "cl_tfa_inspection_ckey"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_inspection_old"),
-            Command = "cl_tfa_inspection_old"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_ironsights_toggle"),
-            Command = "cl_tfa_ironsights_toggle"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_ironsights_resight"),
-            Command = "cl_tfa_ironsights_resight"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_scope_sensitivity_autoscale"),
-            Command = "cl_tfa_scope_sensitivity_autoscale"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_scope_sensitivity"),
-            Command = "cl_tfa_scope_sensitivity",
-            Type = "Integer",
-            Min = "1",
-            Max = "100"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_gunbob_intensity"),
-            Command = "cl_tfa_gunbob_intensity",
-            Type = "Float",
-            Min = "0",
-            Max = "2"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_viewbob_intensity"),
-            Command = "cl_tfa_viewbob_intensity",
-            Type = "Float",
-            Min = "0",
-            Max = "2"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_viewmodel_offset_x"),
-            Command = "cl_tfa_viewmodel_offset_x",
-            Type = "Float",
-            Min = "-2",
-            Max = "2"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_viewmodel_offset_y"),
-            Command = "cl_tfa_viewmodel_offset_y",
-            Type = "Float",
-            Min = "-2",
-            Max = "2"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_viewmodel_offset_z"),
-            Command = "cl_tfa_viewmodel_offset_z",
-            Type = "Float",
-            Min = "-2",
-            Max = "2"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_cl_viewmodel_offset_fov"),
-            Command = "cl_tfa_viewmodel_offset_fov",
-            Type = "Float",
-            Min = "-5",
-            Max = "5"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_viewmodel_centered"),
-            Command = "cl_tfa_viewmodel_centered"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_cl_viewmodel_flip"),
-            Command = "cl_tfa_viewmodel_flip"
-        })
+        addCheck(panel, "ui_cl_viewmodel_centered", "cl_tfa_viewmodel_centered")
+        addCheck(panel, "ui_cl_viewmodel_flip", "cl_tfa_viewmodel_flip")
 
         addFooter(panel)
     end
@@ -325,84 +174,26 @@ if CLIENT then
             cl_tfa_fx_impact_enabled = "1",
             cl_tfa_fx_gasblur = "1",
             cl_tfa_fx_muzzlesmoke = "1",
+            cl_tfa_fx_ejectionsmoke = "1",
             cl_tfa_inspection_bokeh = "0"
         }
 
         panel:AddControl("ComboBox", tfaOptionPerf)
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_perf_fx_gasblur"),
-            Command = "cl_tfa_fx_gasblur"
-        })
+        addCheck(panel, "ui_perf_fx_gasblur", "cl_tfa_fx_gasblur")
+        addCheck(panel, "ui_perf_fx_muzzlesmoke", "cl_tfa_fx_muzzlesmoke")
+        addCheck(panel, "ui_perf_fx_ejectionsmoke", "cl_tfa_fx_ejectionsmoke")
+        addCheck(panel, "ui_perf_fx_impact", "cl_tfa_fx_impact_enabled")
+        addCheck(panel, "ui_perf_inspection_bokeh", "cl_tfa_inspection_bokeh")
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_perf_fx_muzzlesmoke"),
-            Command = "cl_tfa_fx_muzzlesmoke"
-        })
+        panel:AddControl("Label", { Text = L("ui_perf_overrides") })
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_perf_fx_ejectionsmoke"),
-            Command = "cl_tfa_fx_ejectionsmoke"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_perf_fx_impact"),
-            Command = "cl_tfa_fx_impact_enabled"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_perf_inspection_bokeh"),
-            Command = "cl_tfa_inspection_bokeh"
-        })
-
-        panel:AddControl("Label", {
-            Text = L("ui_perf_overrides")
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_sv_penetration_decal"),
-            Command = "sv_tfa_fx_penetration_decal"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_fx_gas_override"),
-            Command = "sv_tfa_fx_gas_override",
-            Type = "Integer",
-            Min = "-1",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_fx_impact_override"),
-            Command = "sv_tfa_fx_impact_override",
-            Type = "Integer",
-            Min = "-1",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_fx_muzzlesmoke_override"),
-            Command = "sv_tfa_fx_muzzlesmoke_override",
-            Type = "Integer",
-            Min = "-1",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_fx_ejectionsmoke_override"),
-            Command = "sv_tfa_fx_ejectionsmoke_override",
-            Type = "Integer",
-            Min = "-1",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_sv_worldmodel_culldistance"),
-            Command = "sv_tfa_worldmodel_culldistance",
-            Type = "Integer",
-            Min = "-1",
-            Max = "4096"
-        })
+        addCheck(panel, "ui_sv_penetration_decal", "sv_tfa_fx_penetration_decal")
+        addSlider(panel, "ui_sv_fx_gas_override", "sv_tfa_fx_gas_override", "Integer", -1, 1)
+        addSlider(panel, "ui_sv_fx_impact_override", "sv_tfa_fx_impact_override", "Integer", -1, 1)
+        addSlider(panel, "ui_sv_fx_muzzlesmoke_override", "sv_tfa_fx_muzzlesmoke_override", "Integer", -1, 1)
+        addSlider(panel, "ui_sv_fx_ejectionsmoke_override", "sv_tfa_fx_ejectionsmoke_override", "Integer", -1, 1)
+        addSlider(panel, "ui_sv_worldmodel_culldistance", "sv_tfa_worldmodel_culldistance", "Integer", -1, 4096)
 
         addFooter(panel)
     end
@@ -449,67 +240,20 @@ if CLIENT then
 
         panel:AddControl("ComboBox", tfaTBLOptionHUD)
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_hud_custom"),
-            Command = "cl_tfa_hud_enabled"
-        })
+        addCheck(panel, "ui_hud_custom", "cl_tfa_hud_enabled")
 
-        panel:AddControl("Slider", {
-            Label = L("ui_hud_ammo_fadein"),
-            Command = "cl_tfa_hud_ammodata_fadein",
-            Type = "Float",
-            Min = "0.01",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_hud_hangtime"),
-            Command = "cl_tfa_hud_hangtime",
-            Type = "Float",
-            Min = "0",
-            Max = "5"
-        })
+        addSlider(panel, "ui_hud_ammo_fadein", "cl_tfa_hud_ammodata_fadein", "Float", 0.01, 1)
+        addSlider(panel, "ui_hud_hangtime", "cl_tfa_hud_hangtime", "Float", 0, 5)
 
         panel:AddControl("Label", { Text = L("ui_crosshair_section") })
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_crosshair_custom"),
-            Command = "cl_tfa_hud_crosshair_enable_custom"
-        })
+        addCheck(panel, "ui_crosshair_custom", "cl_tfa_hud_crosshair_enable_custom")
+        addCheck(panel, "ui_crosshair_dot", "cl_tfa_hud_crosshair_dot")
+        addCheck(panel, "ui_crosshair_length_pixels", "cl_tfa_hud_crosshair_length_use_pixels")
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_crosshair_dot"),
-            Command = "cl_tfa_hud_crosshair_dot"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_crosshair_length_pixels"),
-            Command = "cl_tfa_hud_crosshair_length_use_pixels"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_crosshair_length"),
-            Command = "cl_tfa_hud_crosshair_length",
-            Type = "Float",
-            Min = "0",
-            Max = "10"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_crosshair_gap_scale"),
-            Command = "cl_tfa_hud_crosshair_gap_scale",
-            Type = "Float",
-            Min = "0",
-            Max = "2"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_crosshair_width"),
-            Command = "cl_tfa_hud_crosshair_width",
-            Type = "Integer",
-            Min = "0",
-            Max = "3"
-        })
+        addSlider(panel, "ui_crosshair_length", "cl_tfa_hud_crosshair_length", "Float", 0, 10)
+        addSlider(panel, "ui_crosshair_gap_scale", "cl_tfa_hud_crosshair_gap_scale", "Float", 0, 2)
+        addSlider(panel, "ui_crosshair_width", "cl_tfa_hud_crosshair_width", "Integer", 0, 3)
 
         panel:AddControl("Color", {
             Label = L("ui_crosshair_color"),
@@ -522,23 +266,9 @@ if CLIENT then
             Multiplier = 255
         })
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_crosshair_teamcolor"),
-            Command = "cl_tfa_hud_crosshair_color_team"
-        })
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_crosshair_outline"),
-            Command = "cl_tfa_hud_crosshair_outline_enabled"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_crosshair_outline_width"),
-            Command = "cl_tfa_hud_crosshair_outline_width",
-            Type = "Integer",
-            Min = "0",
-            Max = "3"
-        })
+        addCheck(panel, "ui_crosshair_teamcolor", "cl_tfa_hud_crosshair_color_team")
+        addCheck(panel, "ui_crosshair_outline", "cl_tfa_hud_crosshair_outline_enabled")
+        addSlider(panel, "ui_crosshair_outline_width", "cl_tfa_hud_crosshair_outline_width", "Integer", 0, 3)
 
         panel:AddControl("Color", {
             Label = L("ui_crosshair_outline_color"),
@@ -551,34 +281,10 @@ if CLIENT then
             Multiplier = 255
         })
 
-        panel:AddControl("CheckBox", {
-            Label = L("ui_hitmarker_enable"),
-            Command = "cl_tfa_hud_hitmarker_enabled"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_hitmarker_solid_time"),
-            Command = "cl_tfa_hud_hitmarker_solidtime",
-            Type = "Float",
-            Min = "0",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_hitmarker_fade_time"),
-            Command = "cl_tfa_hud_hitmarker_fadetime",
-            Type = "Float",
-            Min = "0",
-            Max = "1"
-        })
-
-        panel:AddControl("Slider", {
-            Label = L("ui_hitmarker_scale"),
-            Command = "cl_tfa_hud_hitmarker_scale",
-            Type = "Float",
-            Min = "0",
-            Max = "5"
-        })
+        addCheck(panel, "ui_hitmarker_enable", "cl_tfa_hud_hitmarker_enabled")
+        addSlider(panel, "ui_hitmarker_solid_time", "cl_tfa_hud_hitmarker_solidtime", "Float", 0, 1)
+        addSlider(panel, "ui_hitmarker_fade_time", "cl_tfa_hud_hitmarker_fadetime", "Float", 0, 1)
+        addSlider(panel, "ui_hitmarker_scale", "cl_tfa_hud_hitmarker_scale", "Float", 0, 5)
 
         panel:AddControl("Color", {
             Label = L("ui_hitmarker_color"),
@@ -595,7 +301,7 @@ if CLIENT then
     end
 
     local function tfaOptionDeveloper(panel)
-        local tfaOptionPerf = {
+        local tfaOptionDev = {
             Options = {},
             CVars = {},
             Label = "#Presets",
@@ -603,23 +309,24 @@ if CLIENT then
             Folder = "TFA SWEP Settings Developer"
         }
 
-        tfaOptionPerf.Options["#Default"] = {}
+        tfaOptionDev.Options["#Default"] = {}
 
-        panel:AddControl("ComboBox", tfaOptionPerf)
-
-        panel:AddControl("CheckBox", {
-            Label = L("ui_debug_crosshair"),
-            Command = "cl_tfa_debugcrosshair"
-        })
-
+        panel:AddControl("ComboBox", tfaOptionDev)
+        addCheck(panel, "ui_debug_crosshair", "cl_tfa_debugcrosshair")
         addFooter(panel)
     end
 
     local function tfaOptionLanguage(panel)
-        panel:ControlHelp(L("ui_language_desc"))
-        panel:ControlHelp(L("ui_language_note"))
+        if panel and panel.ControlHelp then
+            panel:ControlHelp(L("ui_language_desc"))
+            panel:ControlHelp(L("ui_language_note"))
+        end
 
-        local combo = panel:ComboBox(L("ui_language_label"), "cl_tfa_language")
+        local combo = panel and panel.ComboBox and panel:ComboBox(L("ui_language_label"), "cl_tfa_language")
+        if not combo then
+            addFooter(panel)
+            return
+        end
 
         if combo.SetSortItems then
             combo:SetSortItems(false)
@@ -632,29 +339,31 @@ if CLIENT then
         end
 
         local current = GetConVar and GetConVar("cl_tfa_language")
-        local selected = current and current:GetString() or "en"
-
+        local selected = current and current.GetString and current:GetString() or "en"
         if selected == "" then
             selected = "en"
         end
 
         for id, code in ipairs(choices) do
             if code == selected then
-                combo:ChooseOptionID(id)
+                if combo.ChooseOptionID then
+                    combo:ChooseOptionID(id)
+                end
                 break
             end
         end
 
-        function combo:OnSelect(_, _, data)
-            if data then
-                RunConsoleCommand("cl_tfa_language", data)
+        function combo:OnSelect(_, value, data)
+            local v = data or value
+            if v ~= nil then
+                RunConsoleCommand("cl_tfa_language", tostring(v))
             end
         end
 
         addFooter(panel)
     end
 
-    function tfaAddOption()
+    local function tfaAddOption()
         local category = L("ui_menu_title")
 
         spawnmenu_AddToolMenuOption("Options", category, "TFASwepBaseLanguage", L("ui_cat_language"), "", "", tfaOptionLanguage)
@@ -666,7 +375,7 @@ if CLIENT then
     end
 
     local function refreshLanguage()
-        if not spawnmenu_RebuildToolMenu then
+        if not (spawnmenu_RebuildToolMenu and timer_Simple) then
             return
         end
 
@@ -677,7 +386,10 @@ if CLIENT then
         end)
     end
 
-    cvars_AddChangeCallback("cl_tfa_language", refreshLanguage, "tfaLangRefresh")
+    if cvars_AddChangeCallback then
+        cvars_AddChangeCallback("cl_tfa_language", refreshLanguage, "tfaLangRefresh")
+    end
+
     hook_Add("PopulateToolMenu", "tfaAddOption", tfaAddOption)
 else
     AddCSLuaFile()

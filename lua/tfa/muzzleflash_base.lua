@@ -1,15 +1,21 @@
 if SERVER then AddCSLuaFile() end
 
+local CurTime = CurTime
+
 EFFECT.Life = EFFECT.Life or 0.05
 
-function EFFECT:Init(data)
-	self.DieTime = CurTime() + (self.Life or 0.05)
+function EFFECT:Init()
+    local life = self.Life or 0.05
+    self.DieTime = CurTime() + life
 end
 
 function EFFECT:Think()
-	return self.DieTime and CurTime() < self.DieTime
+    local dt = self.DieTime
+    if not dt then
+        return false
+    end
+    return CurTime() < dt
 end
 
 function EFFECT:Render()
-	-- Compat stub: effects that include this base define visuals themselves
 end

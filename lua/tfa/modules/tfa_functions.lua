@@ -1,25 +1,32 @@
 TFA = TFA or {}
+local TFA = TFA
+
 TFA.DegreesToAccuracy = TFA.DegreesToAccuracy or (math.pi / 180)
 
-local tmpsp = game.SinglePlayer()
+local game_SinglePlayerFn = game and game.SinglePlayer
+local tmpsp = game_SinglePlayerFn and game_SinglePlayerFn() or false
 
 local GetConVar = GetConVar
-local game_GetTimeScale = game.GetTimeScale
-local game_SinglePlayer = game.SinglePlayer
+local game_GetTimeScale = game and game.GetTimeScale
 local Entity = Entity
 local LocalPlayer = LocalPlayer
 local IsValid = IsValid
+local FrameTime = FrameTime
+local SysTime = SysTime
+
 local math_Clamp = math.Clamp
 local math_Round = math.Round
+
 local pairs = pairs
 local istable = istable
 local isstring = isstring
 local string_sub = string.sub
-local string_lower = string.lower
-local string_find = string.find
-local sound_Add = sound.Add
-local FrameTime = FrameTime
-local SysTime = SysTime
+
+local sound_Add = sound and sound.Add
+local game_AddAmmoType = game and game.AddAmmoType
+local language_Add = language and language.Add
+
+local hook_Add = hook and hook.Add
 
 local gas_cl_enabled = GetConVar("cl_tfa_fx_gasblur")
 local gas_sv_enabled = GetConVar("sv_tfa_fx_gas_override")
@@ -27,21 +34,36 @@ local sv_cheats_cv = GetConVar("sv_cheats")
 local host_timescale_cv = GetConVar("host_timescale")
 
 local ft = 0.01
-local LastSys
+local lastSys
 
 local SoundChars = {
-    ["*"] = "STREAM",
-    ["#"] = "DRYMIX",
-    ["@"] = "OMNI",
-    [">"] = "DOPPLER",
-    ["<"] = "DIRECTIONAL",
-    ["^"] = "DISTVARIANT",
-    ["("] = "SPATIALSTEREO_LOOP",
-    [")"] = "SPATIALSTEREO",
-    ["}"] = "FASTPITCH",
-    ["$"] = "CRITICAL",
-    ["!"] = "SENTENCE",
-    ["?"] = "USERVOX"
+    [string.byte("*")] = true,
+    [string.byte("#")] = true,
+    [string.byte("@")] = true,
+    [string.byte(">")] = true,
+    [string.byte("<")] = true,
+    [string.byte("^")] = true,
+    [string.byte("(")] = true,
+    [string.byte(")")] = true,
+    [string.byte("}")] = true,
+    [string.byte("$")] = true,
+    [string.byte("!")] = true,
+    [string.byte("?")] = true
+}
+
+local SoundCharByName = {
+    STREAM = "*",
+    DRYMIX = "#",
+    OMNI = "@",
+    DOPPLER = ">",
+    DIRECTIONAL = "<",
+    DISTVARIANT = "^",
+    SPATIALSTEREO_LOOP = "(",
+    SPATIALSTEREO = ")",
+    FASTPITCH = "}",
+    CRITICAL = "$",
+    SENTENCE = "!",
+    USERVOX = "?"
 }
 
 local DefaultSoundChar = ")"
@@ -53,37 +75,25 @@ local SoundChannels = {
 }
 
 function TFA.PatchSound(path, kind)
-    local firstChar = string_sub(path, 1, 1)
-    local actualPath
-
-    if SoundChars[firstChar] then
-        actualPath = string_sub(path, 2)
-    else
-        actualPath = path
+    if not path or path == "" then
+        return DefaultSoundChar
     end
 
+    local first = string_sub(path, 1, 1)
+    local b = string.byte(first)
+    local actualPath = SoundChars[b] and string_sub(path, 2) or path
+
     local kindstr = kind or DefaultSoundChar
-
-    if #kindstr > 1 then
-        local found = false
-
-        for c, name in pairs(SoundChars) do
-            if name == kind then
-                kindstr = c
-                found = true
-                break
-            end
-        end
-
-        if not found then
-            kindstr = DefaultSoundChar
-        end
+    if kindstr ~= DefaultSoundChar and #kindstr > 1 then
+        kindstr = SoundCharByName[kindstr] or DefaultSoundChar
     end
 
     return kindstr .. actualPath
 end
 
 local function addSound(id, path, kind, channel, level)
+    if not sound_Add or not id then return end
+
     local pitch = { 97, 103 }
 
     if isstring(path) then
@@ -95,9 +105,11 @@ local function addSound(id, path, kind, channel, level)
             pitch = pitch,
             sound = TFA.PatchSound(path, kind)
         })
-    elseif istable(path) then
-        local patched = {}
+        return
+    end
 
+    if istable(path) then
+        local patched = {}
         for k, v in pairs(path) do
             patched[k] = TFA.PatchSound(v, kind)
         end
@@ -114,7 +126,7 @@ local function addSound(id, path, kind, channel, level)
 end
 
 function TFA.AddSound(id, channel, volume, level, pitch, path, kindv)
-    if not id then return end
+    if not sound_Add or not id then return end
 
     channel = channel or CHAN_AUTO
     volume = volume or 1
@@ -132,11 +144,9 @@ function TFA.AddSound(id, channel, volume, level, pitch, path, kindv)
         sndpath = TFA.PatchSound(sndpath, kindv)
     elseif istable(sndpath) then
         local patched = {}
-
         for k, v in pairs(sndpath) do
             patched[k] = TFA.PatchSound(v, kindv)
         end
-
         sndpath = patched
     else
         return
@@ -144,9 +154,7 @@ function TFA.AddSound(id, channel, volume, level, pitch, path, kindv)
 
     if not pitchval then
         pitchval = { 97, 103 }
-    elseif istable(pitchval) then
-        -- already a range
-    else
+    elseif not istable(pitchval) then
         pitchval = { pitchval, pitchval }
     end
 
@@ -163,53 +171,70 @@ end
 function TFA.AddFireSound(id, path, wrap, kindv)
     local kind = kindv or DefaultSoundChar
     local channel = wrap and SoundChannels.shootwrap or SoundChannels.shoot
-
     addSound(id, path, kind, channel, 120)
 end
 
 function TFA.AddWeaponSound(id, path, kindv)
     local kind = kindv or DefaultSoundChar
-    local channel = SoundChannels.misc
-
-    addSound(id, path, kind, channel, 80)
+    addSound(id, path, kind, SoundChannels.misc, 80)
 end
 
 local AmmoTypes = {}
 
 function TFA.AddAmmo(id, name)
-    if AmmoTypes[name] then
-        return AmmoTypes[name]
+    if not game_AddAmmoType or not id or not name then
+        return id
+    end
+
+    local existing = AmmoTypes[name]
+    if existing then
+        return existing
     end
 
     AmmoTypes[name] = id
-    game.AddAmmoType({ name = id })
+    game_AddAmmoType({ name = id })
 
-    if language then
-        language.Add(id .. "_ammo", name)
+    if language_Add then
+        language_Add(id .. "_ammo", name)
     end
 
     return id
 end
 
-hook.Add("Think", "TFAFrameTimeThink", function()
-    local curSys = SysTime()
-    local delta = curSys - (LastSys or curSys)
+if hook_Add and SysTime and FrameTime and game_GetTimeScale and math_Clamp then
+    hook_Add("Think", "TFAFrameTimeThink", function()
+        local curSys = SysTime()
+        local prev = lastSys or curSys
+        local delta = curSys - prev
 
-    ft = delta * game_GetTimeScale()
+        local ts = game_GetTimeScale()
+        if ts then
+            ft = delta * ts
+        else
+            ft = delta
+        end
 
-    local frameFt = FrameTime()
-    if ft > frameFt then
-        ft = frameFt
-    end
+        local frameFt = FrameTime()
+        if ft > frameFt then
+            ft = frameFt
+        end
 
-    ft = math_Clamp(ft, 0, 1 / 30)
+        ft = math_Clamp(ft, 0, 1 / 30)
 
-    if sv_cheats_cv:GetBool() and host_timescale_cv:GetFloat() < 1 then
-        ft = ft * host_timescale_cv:GetFloat()
-    end
+        if not sv_cheats_cv then
+            sv_cheats_cv = GetConVar("sv_cheats")
+        end
+        if not host_timescale_cv then
+            host_timescale_cv = GetConVar("host_timescale")
+        end
 
-    LastSys = curSys
-end)
+        if sv_cheats_cv and sv_cheats_cv:GetBool() and host_timescale_cv and host_timescale_cv:GetFloat() < 1 then
+            ft = ft * host_timescale_cv:GetFloat()
+        end
+
+        lastSys = curSys
+    end)
+end
 
 function TFA.FrameTime()
     return ft
@@ -221,8 +246,14 @@ function TFA.GetGasEnabled()
         if IsValid(ent) then
             return math_Round(ent:GetInfoNum("cl_tfa_fx_gasblur", 0)) ~= 0
         end
-
         return false
+    end
+
+    if not gas_cl_enabled then
+        gas_cl_enabled = GetConVar("cl_tfa_fx_gasblur")
+    end
+    if not gas_sv_enabled then
+        gas_sv_enabled = GetConVar("sv_tfa_fx_gas_override")
     end
 
     local enabled = gas_cl_enabled and gas_cl_enabled:GetBool() or false
@@ -245,8 +276,14 @@ function TFA.GetMZSmokeEnabled()
         if IsValid(ent) then
             return math_Round(ent:GetInfoNum("cl_tfa_fx_muzzlesmoke", 0)) ~= 0
         end
-
         return false
+    end
+
+    if not muzzlesmoke_cl_enabled then
+        muzzlesmoke_cl_enabled = GetConVar("cl_tfa_fx_muzzlesmoke")
+    end
+    if not muzzlesmoke_sv_enabled then
+        muzzlesmoke_sv_enabled = GetConVar("sv_tfa_fx_muzzlesmoke_override")
     end
 
     local enabled = muzzlesmoke_cl_enabled and muzzlesmoke_cl_enabled:GetBool() or false
@@ -264,15 +301,20 @@ function TFA.GetEJSmokeEnabled()
         if IsValid(ent) then
             return math_Round(ent:GetInfoNum("cl_tfa_fx_ejectionsmoke", 0)) ~= 0
         end
-
         return false
+    end
+
+    if not ejectionsmoke_cl_enabled then
+        ejectionsmoke_cl_enabled = GetConVar("cl_tfa_fx_ejectionsmoke")
+    end
+    if not ejectionsmoke_sv_enabled then
+        ejectionsmoke_sv_enabled = GetConVar("sv_tfa_fx_ejectionsmoke_override")
     end
 
     local enabled = ejectionsmoke_cl_enabled and ejectionsmoke_cl_enabled:GetBool() or false
 
     if ejectionsmoke_sv_enabled then
         local mode = ejectionsmoke_sv_enabled:GetInt()
-
         if mode == 0 then
             enabled = false
         elseif mode == 1 then
@@ -292,8 +334,14 @@ function TFA.GetRicochetEnabled()
         if IsValid(ent) then
             return math_Round(ent:GetInfoNum("cl_tfa_fx_impact_ricochet_enabled", 0)) ~= 0
         end
-
         return false
+    end
+
+    if not ricofx_cl_enabled then
+        ricofx_cl_enabled = GetConVar("cl_tfa_fx_impact_ricochet_enabled")
+    end
+    if not ricofx_sv_enabled then
+        ricofx_sv_enabled = GetConVar("sv_tfa_fx_ricochet_override")
     end
 
     local enabled = ricofx_cl_enabled and ricofx_cl_enabled:GetBool() or false
@@ -314,7 +362,7 @@ function TFA.PlayerCarryingTFAWeapon(ply)
             else
                 return false, nil, nil
             end
-        elseif game_SinglePlayer() then
+        elseif tmpsp then
             ply = Entity(1)
         else
             return false, nil, nil
@@ -326,12 +374,10 @@ function TFA.PlayerCarryingTFAWeapon(ply)
     end
 
     local wep = ply:GetActiveWeapon()
-
     if IsValid(wep) then
         if wep.IsTFAWeapon then
             return true, ply, wep
         end
-
         return false, ply, wep
     end
 

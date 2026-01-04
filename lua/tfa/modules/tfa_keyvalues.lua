@@ -1,206 +1,221 @@
-local CHAR_STRING = { ['"'] = true, ["'"] = true }
-local CHAR_TABLE_OPEN = { ["{"] = true, ["["] = true }
-local CHAR_TABLE_CLOSE = { ["}"] = true, ["]"] = true }
-local CHAR_WHITESPACE = { [" "] = true, ["\t"] = true, ["\r"] = true, ["\n"] = true }
-local CHAR_NEWLINE = { ["\r"] = true, ["\n"] = true }
-local CHAR_COMMENT = { ["/"] = true, ["-"] = true }
+TFA = TFA or {}
+local TFA = TFA
 
-local KEY_CASE = true
-local ORDERED = false
-
-local buffer = ""
-local tbl = {}
-local tbl_focus
-local tbl_tmp
-local value
-local lastvalue
-local ignore_next_pop
-local escape
-local stringtype
-local is_comment = false
-local f
-
-local strsub = string.sub
 local strlow = string.lower
-local fread = file.Read
+local table_concat = table.concat
+local fread = file and file.Read
 local istable = istable
 
-local function strchar(strv, ind)
-    return strsub(strv, ind, ind)
+local CHAR = {}
+for i = 0, 255 do
+    CHAR[i] = string.char(i)
 end
 
-local function ResetValues()
-    lastvalue = nil
-    value = nil
+local B_SLASH = 92
+local B_T = 116
+local B_N = 110
+local B_R = 114
+
+local B_Q1 = 34
+local B_Q2 = 39
+
+local B_WS1 = 32
+local B_WS2 = 9
+local B_WS3 = 13
+local B_WS4 = 10
+
+local B_TOPEN1 = 123
+local B_TOPEN2 = 91
+local B_TCLOSE1 = 125
+local B_TCLOSE2 = 93
+
+local B_COMMENT1 = 47
+local B_COMMENT2 = 45
+
+local function isWhitespaceByte(b)
+    return b == B_WS1 or b == B_WS2 or b == B_WS3 or b == B_WS4
 end
 
-local function FlushBuffer(write)
-    if buffer ~= "" or stringtype then
-        lastvalue = value
-
-        if lastvalue and not KEY_CASE then
-            lastvalue = strlow(lastvalue)
-        end
-
-        value = buffer
-        buffer = ""
-
-        if tbl_focus and (write == nil or write) and lastvalue and value then
-            if ORDERED then
-                tbl_focus[#tbl_focus + 1] = { key = lastvalue, value = value }
-            else
-                tbl_focus[lastvalue] = value
-            end
-
-            ResetValues()
-        end
-    end
+local function isNewlineByte(b)
+    return b == B_WS3 or b == B_WS4
 end
 
-local function PushTable()
-    FlushBuffer(true)
-
-    if value and not KEY_CASE then
-        value = strlow(value)
-    end
-
-    if value and value ~= "" then
-        if ORDERED then
-            tbl_focus[#tbl_focus + 1] = { key = value, value = {} }
-            tbl_focus[#tbl_focus].value.__par = tbl_focus
-            tbl_focus = tbl_focus[#tbl_focus].value
-        else
-            tbl_focus[value] = istable(tbl_focus[value]) and tbl_focus[value] or {}
-            tbl_focus[value].__par = tbl_focus
-            tbl_focus = tbl_focus[value]
-        end
-
-        ignore_next_pop = false
-    else
-        ignore_next_pop = true
-    end
-
-    ResetValues()
+local function isStringByte(b)
+    return b == B_Q1 or b == B_Q2
 end
 
-local function PopTable()
-    if not ignore_next_pop then
-        FlushBuffer(true)
+local function isTableOpenByte(b)
+    return b == B_TOPEN1 or b == B_TOPEN2
+end
 
-        if tbl_focus.__par then
-            tbl_tmp = tbl_focus.__par
-            tbl_focus.__par = nil
-            tbl_focus = tbl_tmp
-        end
-    end
+local function isTableCloseByte(b)
+    return b == B_TCLOSE1 or b == B_TCLOSE2
+end
 
-    ignore_next_pop = false
-    ResetValues()
+local function isCommentStartByte(b)
+    return b == B_COMMENT1 or b == B_COMMENT2
 end
 
 function TFA.ParseKeyValues(fn, path, use_escape, keep_key_case, invalid_escape_addslash, ordered)
-    if use_escape == nil then
-        use_escape = true
+    if use_escape == nil then use_escape = true end
+    if keep_key_case == nil then keep_key_case = true end
+    if invalid_escape_addslash == nil then invalid_escape_addslash = true end
+
+    local KEY_CASE = keep_key_case
+    local ORDERED = ordered and true or false
+
+    local data = fread and fread(fn, path) or nil
+    if not data or data == "" then
+        return {}
     end
 
-    if keep_key_case == nil then
-        keep_key_case = true
+    local root = {}
+    local focus = root
+
+    local buffer = {}
+    local blen = 0
+
+    local value
+    local lastvalue
+    local ignore_next_pop = false
+    local escape = false
+    local stringtype
+    local is_comment = false
+
+    local function resetValues()
+        lastvalue = nil
+        value = nil
     end
 
-    KEY_CASE = keep_key_case
+    local function flushBuffer(write)
+        if blen > 0 or stringtype then
+            lastvalue = value
+            if lastvalue and not KEY_CASE then
+                lastvalue = strlow(lastvalue)
+            end
 
-    if invalid_escape_addslash == nil then
-        invalid_escape_addslash = true
+            value = blen > 0 and table_concat(buffer, "", 1, blen) or ""
+            blen = 0
+
+            if focus and (write == nil or write) and lastvalue and value ~= nil then
+                if ORDERED then
+                    focus[#focus + 1] = { key = lastvalue, value = value }
+                else
+                    focus[lastvalue] = value
+                end
+                resetValues()
+            end
+        end
     end
 
-    if ordered then
-        ORDERED = true
-    else
-        ORDERED = false
-    end
+    local function pushTable()
+        flushBuffer(true)
 
-    tbl = {}
-    tbl_focus = tbl
-    tbl_tmp = nil
-    value = nil
-    lastvalue = nil
-    escape = false
-    is_comment = false
-    stringtype = nil
-    buffer = ""
-
-    f = fread(fn, path)
-
-    if not f then
-        return tbl
-    end
-
-    local len = #f
-
-    for i = 1, len do
-        local char = strchar(f, i)
-
-        if not char then
-            FlushBuffer()
-            break
+        if value and not KEY_CASE then
+            value = strlow(value)
         end
 
+        if value and value ~= "" then
+            if ORDERED then
+                focus[#focus + 1] = { key = value, value = {} }
+                local child = focus[#focus].value
+                child.__par = focus
+                focus = child
+            else
+                local child = focus[value]
+                if not istable(child) then
+                    child = {}
+                    focus[value] = child
+                end
+                child.__par = focus
+                focus = child
+            end
+            ignore_next_pop = false
+        else
+            ignore_next_pop = true
+        end
+
+        resetValues()
+    end
+
+    local function popTable()
+        if not ignore_next_pop then
+            flushBuffer(true)
+            local parent = focus and focus.__par
+            if parent then
+                focus.__par = nil
+                focus = parent
+            end
+        end
+
+        ignore_next_pop = false
+        resetValues()
+    end
+
+    local len = #data
+
+    for i = 1, len do
+        local b = data:byte(i)
+
         if is_comment then
-            if CHAR_NEWLINE[char] then
+            if isNewlineByte(b) then
                 is_comment = false
             end
         elseif escape then
-            if char == "t" then
-                buffer = buffer .. "\t"
-            elseif char == "n" then
-                buffer = buffer .. "\n"
-            elseif char == "r" then
-                buffer = buffer
+            if b == B_T then
+                blen = blen + 1
+                buffer[blen] = "\t"
+            elseif b == B_N then
+                blen = blen + 1
+                buffer[blen] = "\n"
+            elseif b == B_R then
             else
                 if invalid_escape_addslash then
-                    buffer = buffer .. "\\"
+                    blen = blen + 1
+                    buffer[blen] = "\\"
                 end
-
-                buffer = buffer .. char
+                blen = blen + 1
+                buffer[blen] = CHAR[b]
             end
-
             escape = false
-        elseif char == "\\" and use_escape then
+        elseif b == B_SLASH and use_escape then
             escape = true
-        elseif CHAR_STRING[char] then
+        elseif isStringByte(b) then
             if not stringtype then
-                FlushBuffer()
-                stringtype = char
-            elseif stringtype == char then
-                FlushBuffer()
+                flushBuffer()
+                stringtype = b
+            elseif stringtype == b then
+                flushBuffer()
                 stringtype = nil
             else
-                buffer = buffer .. char
+                blen = blen + 1
+                buffer[blen] = CHAR[b]
             end
         elseif stringtype then
-            buffer = buffer .. char
-        elseif CHAR_COMMENT[char] then
-            local nextchar = strchar(f, i + 1)
-
-            if CHAR_COMMENT[nextchar] then
+            blen = blen + 1
+            buffer[blen] = CHAR[b]
+        elseif isCommentStartByte(b) then
+            local nb = (i < len) and data:byte(i + 1) or nil
+            if nb == b then
                 is_comment = true
             else
-                buffer = buffer .. char
+                blen = blen + 1
+                buffer[blen] = CHAR[b]
             end
-        elseif CHAR_WHITESPACE[char] then
-            if buffer ~= "" then
-                FlushBuffer()
+        elseif isWhitespaceByte(b) then
+            if blen > 0 then
+                flushBuffer()
             end
-        elseif CHAR_TABLE_OPEN[char] then
-            PushTable()
-        elseif CHAR_TABLE_CLOSE[char] then
-            PopTable()
+        elseif isTableOpenByte(b) then
+            pushTable()
+        elseif isTableCloseByte(b) then
+            popTable()
         else
-            buffer = buffer .. char
+            blen = blen + 1
+            buffer[blen] = CHAR[b]
         end
     end
 
-    FlushBuffer()
-
-    return tbl
+    flushBuffer()
+    return root
 end

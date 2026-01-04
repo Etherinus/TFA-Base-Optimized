@@ -6,7 +6,7 @@ local vm
 local wep
 
 if CLIENT then
-    local hook_Add = hook.Add
+    local hook_Add = hook and hook.Add
     local pairs = pairs
     local IsValid = IsValid
     local WorldToLocal = WorldToLocal
@@ -15,22 +15,24 @@ if CLIENT then
     local vector_origin = vector_origin
     local table_insert = table.insert
     local table_RemoveByValue = table.RemoveByValue
-    local timer_Simple = timer.Simple
+    local timer_Simple = timer and timer.Simple
 
-    hook_Add("PostDrawViewModel", "TFAMuzzleUpdate", function(vmod, plyv)
-        vm = vmod
-        ply = plyv
+    if hook_Add then
+        hook_Add("PostDrawViewModel", "TFAMuzzleUpdate", function(vmod, plyv)
+            vm = vmod
+            ply = plyv
 
-        TFAVMAttachments[1] = vmod:GetAttachment(1)
+            TFAVMAttachments[1] = vmod and vmod.GetAttachment and vmod:GetAttachment(1) or nil
 
-        for k, v in pairs(TFAFlareParts) do
-            if v and v.ThinkFunc then
-                v:ThinkFunc()
-            else
-                TFAFlareParts[k] = nil
+            for k, v in pairs(TFAFlareParts) do
+                if v and v.ThinkFunc then
+                    v:ThinkFunc()
+                else
+                    TFAFlareParts[k] = nil
+                end
             end
-        end
-    end)
+        end)
+    end
 
     function TFARegPartThink(particle, partfunc)
         if not particle or not partfunc then
@@ -39,7 +41,7 @@ if CLIENT then
 
         particle.ThinkFunc = partfunc
 
-        if IsValid(particle.FollowEnt) and particle.Att then
+        if IsValid(particle.FollowEnt) and particle.Att and particle.GetPos and particle.GetAngles then
             local angpos = particle.FollowEnt:GetAttachment(particle.Att)
             if angpos and angpos.Pos then
                 particle.OffPos = WorldToLocal(particle:GetPos(), particle:GetAngles(), angpos.Pos, angpos.Ang)
@@ -48,11 +50,17 @@ if CLIENT then
 
         table_insert(TFAFlareParts, particle)
 
-        timer_Simple(particle:GetDieTime(), function()
-            if particle then
-                table_RemoveByValue(TFAFlareParts, particle)
-            end
-        end)
+        if timer_Simple and particle.GetDieTime then
+            local t = particle:GetDieTime()
+            if t == nil then t = 0 end
+            if t < 0 then t = 0 end
+
+            timer_Simple(t, function()
+                if particle then
+                    table_RemoveByValue(TFAFlareParts, particle)
+                end
+            end)
+        end
     end
 
     function TFAMuzzlePartFunc(self, first)
@@ -61,7 +69,7 @@ if CLIENT then
             first = true
         end
 
-        if not IsValid(ply) or not IsValid(vm) then
+        if not (IsValid(ply) and IsValid(vm)) then
             return
         end
 
@@ -77,11 +85,11 @@ if CLIENT then
             end
 
             local firvel = vector_origin
-            if first then
+            if first and owent.GetVelocity then
                 firvel = owent:GetVelocity() * FrameTime() * 1.1
             end
 
-            if self.Att and self.OffPos then
+            if self.Att and self.OffPos and self.GetVelocity and self.SetPos and self.GetAngles and self.GetPos then
                 local angpos
 
                 if self.FollowEnt == vm then

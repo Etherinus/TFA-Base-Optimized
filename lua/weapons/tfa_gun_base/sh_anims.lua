@@ -1,117 +1,216 @@
 ACT_VM_FIDGET_EMPTY = ACT_VM_FIDGET_EMPTY or ACT_CROSSBOW_FIDGET_UNLOADED
 ACT_VM_BLOWBACK = ACT_VM_BLOWBACK or -2
+ACT_VM_HOLSTER_SILENCED = ACT_VM_HOLSTER_SILENCED or ACT_CROSSBOW_HOLSTER_UNLOADED
 
 local ServersideLooped = {
 	[ACT_VM_FIDGET] = true,
-	[ACT_VM_FIDGET_EMPTY] = true,
-	--[ACT_VM_IDLE] = true,
-	--[ACT_VM_IDLE_EMPTY] = true,
-	--[ACT_VM_IDLE_SILENCED] = true
+	[ACT_VM_FIDGET_EMPTY] = true
 }
 
-local IdleBlendTime = 0.0
+local d, pbr
+local tval
 
-local d,pbr
+local function clamp_rate(rate)
+	if rate == nil then return 1 end
+	rate = tonumber(rate) or 1
+	if rate <= 0 then return 0.0001 end
+	return rate
+end
 
-function SWEP:SendViewModelAnim(act, rate, targ, blend )
-	local vm = self.OwnerViewModel
-	self:SetLastActivity( act )
-	if rate and not targ then rate = math.max(rate,0.0001) end
+local function get_vm(self)
+	if self.OwnerViewModel and IsValid(self.OwnerViewModel) then
+		return self.OwnerViewModel
+	end
 
+	local owner = self:GetOwner()
+	if IsValid(owner) then
+		local vm = owner:GetViewModel()
+		if IsValid(vm) then
+			self.OwnerViewModel = vm
+			return vm
+		end
+	end
+
+	return nil
+end
+
+local function set_next_idle(self, dur, rate, blend)
+	if not self.SetNextIdleAnim then return end
+	blend = tonumber(blend) or 0
+	dur = tonumber(dur) or 0
+	rate = tonumber(rate) or 1
+	if rate <= 0 then rate = 0.0001 end
+	local dt = dur / rate - blend
+	if dt < 0 then dt = 0 end
+	self:SetNextIdleAnim(CurTime() + dt)
+end
+
+function SWEP:SendViewModelAnim(act, rate, targ, blend)
+	if act == nil then return end
+	act = tonumber(act) or -1
 	if act < 0 then return end
-
 	if not self:VMIV() then return end
 
-	local seq = vm:SelectWeightedSequenceSeeded(act,CurTime())
-	if seq < 0 then
+	local vm = get_vm(self)
+	if not IsValid(vm) then return end
+
+	local last = self.GetLastActivity and self:GetLastActivity() or nil
+	if self.SetLastActivity then
+		self:SetLastActivity(act)
+	end
+
+	if targ then
+		rate = clamp_rate(rate)
+	else
+		rate = clamp_rate(rate)
+	end
+
+	local seq = vm:SelectWeightedSequenceSeeded(act, CurTime())
+	if not seq or seq < 0 then
 		return
 	end
-	self:ResetEvents()
-	if self:GetLastActivity() == act and ServersideLooped[act] then
-		self:ChooseIdleAnim()
+
+	if self.ResetEvents then
+		self:ResetEvents()
+	end
+
+	local looped_same = (last == act) and ServersideLooped[act] and true or false
+
+	if looped_same then
+		if self.ChooseIdleAnim then
+			self:ChooseIdleAnim()
+		end
+
 		vm:SetPlaybackRate(0)
 		vm:SetCycle(0)
-		self:SetNextIdleAnim( CurTime() + 0.03 )
+
+		if self.SetNextIdleAnim then
+			self:SetNextIdleAnim(CurTime() + 0.03)
+		end
 
 		if IsFirstTimePredicted() then
+			local wep = self
+			local vmref = vm
+
 			timer.Simple(0, function()
-				vm:SendViewModelMatchingSequence(seq)
-				d = vm:SequenceDuration()
-				pbr = targ and ( d / ( rate or 1 ) ) or ( rate or 1 )
-				vm:SetPlaybackRate( pbr )
-				if IsValid(self) then
-					if blend == nil then blend = self.Idle_Smooth end
-					self:SetNextIdleAnim( CurTime() + d / pbr - blend )
+				if not IsValid(wep) then return end
+				local vm2 = get_vm(wep)
+				if not IsValid(vm2) then return end
+				if vm2 ~= vmref then return end
+
+				vm2:SendViewModelMatchingSequence(seq)
+				d = vm2:SequenceDuration()
+				pbr = targ and (d / rate) or rate
+				if pbr <= 0 then pbr = 0.0001 end
+				vm2:SetPlaybackRate(pbr)
+
+				if blend == nil then
+					blend = wep.Idle_Smooth
 				end
+
+				set_next_idle(wep, d, pbr, blend)
 			end)
 		end
 	else
 		vm:SendViewModelMatchingSequence(seq)
 		d = vm:SequenceDuration()
-		pbr = targ and ( d / ( rate or 1 ) ) or ( rate or 1 )
-		vm:SetPlaybackRate( pbr )
-		if IsValid(self) then
-			if blend == nil then blend = self.Idle_Smooth end
-			self:SetNextIdleAnim( CurTime() + d / pbr - blend )
+		pbr = targ and (d / rate) or rate
+		if pbr <= 0 then pbr = 0.0001 end
+		vm:SetPlaybackRate(pbr)
+
+		if blend == nil then
+			blend = self.Idle_Smooth
 		end
+
+		set_next_idle(self, d, pbr, blend)
 	end
+
 	return true, act
 end
 
-function SWEP:SendViewModelSeq(seq, rate, targ, blend )
+function SWEP:SendViewModelSeq(seq, rate, targ, blend)
 	if not self:VMIV() then return end
-	local vm = self.OwnerViewModel
+
+	local vm = get_vm(self)
 	if not IsValid(vm) then return end
 
 	if type(seq) == "string" then
-		seq = vm:LookupSequence(seq) or 0
+		seq = vm:LookupSequence(seq) or -1
 	end
+
+	seq = tonumber(seq) or -1
+	if seq < 0 then return end
 
 	local act = vm:GetSequenceActivity(seq)
-	self:SetLastActivity( act )
-	if seq < 0 then
-		return
+
+	local last = self.GetLastActivity and self:GetLastActivity() or nil
+	if self.SetLastActivity then
+		self:SetLastActivity(act)
 	end
 
-	if not self:VMIV() then return end
-	self:ResetEvents()
-	if self:GetLastActivity() == act and ServersideLooped[act] then
-		vm:SendViewModelMatchingSequence( act == 0 and 1 or 0 )
+	rate = clamp_rate(rate)
+
+	if self.ResetEvents then
+		self:ResetEvents()
+	end
+
+	local looped_same = (last == act) and ServersideLooped[act] and true or false
+
+	if looped_same then
+		vm:SendViewModelMatchingSequence(act == 0 and 1 or 0)
 		vm:SetPlaybackRate(0)
 		vm:SetCycle(0)
-		self:SetNextIdleAnim( CurTime() + 0.03 )
+
+		if self.SetNextIdleAnim then
+			self:SetNextIdleAnim(CurTime() + 0.03)
+		end
 
 		if IsFirstTimePredicted() then
+			local wep = self
+			local vmref = vm
+
 			timer.Simple(0, function()
-				vm:SendViewModelMatchingSequence(seq)
-				d = vm:SequenceDuration()
-				pbr = targ and ( d / ( rate or 1 ) ) or ( rate or 1 )
-				vm:SetPlaybackRate( pbr )
-				if IsValid(self) then
-					if blend == nil then blend = self.Idle_Smooth end
-					self:SetNextIdleAnim( CurTime() + d / pbr - blend )
+				if not IsValid(wep) then return end
+				local vm2 = get_vm(wep)
+				if not IsValid(vm2) then return end
+				if vm2 ~= vmref then return end
+
+				vm2:SendViewModelMatchingSequence(seq)
+				d = vm2:SequenceDuration()
+				pbr = targ and (d / rate) or rate
+				if pbr <= 0 then pbr = 0.0001 end
+				vm2:SetPlaybackRate(pbr)
+
+				if blend == nil then
+					blend = wep.Idle_Smooth
 				end
+
+				set_next_idle(wep, d, pbr, blend)
 			end)
 		end
 	else
 		vm:SendViewModelMatchingSequence(seq)
 		d = vm:SequenceDuration()
-		pbr = targ and ( d / ( rate or 1 ) ) or ( rate or 1 )
-		vm:SetPlaybackRate( pbr )
-		if IsValid(self) then
-			if blend == nil then blend = self.Idle_Smooth end
-			self:SetNextIdleAnim( CurTime() + d / pbr - blend )
+		pbr = targ and (d / rate) or rate
+		if pbr <= 0 then pbr = 0.0001 end
+		vm:SetPlaybackRate(pbr)
+
+		if blend == nil then
+			blend = self.Idle_Smooth
 		end
+
+		set_next_idle(self, d, pbr, blend)
 	end
+
 	return true, act
 end
-
-local tval
 
 function SWEP:PlayAnimation(data)
 	if not self:VMIV() then return end
 	if not data then return false, -1 end
-	local vm = self.OwnerViewModel
+
+	local vm = get_vm(self)
+	if not IsValid(vm) then return false, -1 end
 
 	if data.type == TFA.Enum.ANIMATION_ACT then
 		tval = data.value
@@ -148,7 +247,9 @@ function SWEP:PlayAnimation(data)
 			tval = tonumber(tval) or -1
 		end
 
-		if tval and tval > 0 then return self:SendViewModelAnim(tval, 1, false, data.transition and self.Idle_Blend or self.Idle_Smooth) end
+		if tval and tval > 0 then
+			return self:SendViewModelAnim(tval, 1, false, data.transition and self.Idle_Blend or self.Idle_Smooth)
+		end
 	elseif data.type == TFA.Enum.ANIMATION_SEQ then
 		tval = data.value
 
@@ -164,62 +265,49 @@ function SWEP:PlayAnimation(data)
 			tval = vm:LookupSequence(tval)
 		end
 
-		if tval and tval > 0 then return self:SendViewModelSeq(tval, 1, false, data.transition and self.Idle_Blend or self.Idle_Smooth) end
-	end
-end
-
-local success, tanim
-
---[[
-Function Name:  Locomote
-Syntax: self:Locomote( flip ironsights, new is, flip sprint, new sprint).
-Returns:
-Notes:
-Purpose:  Animation / Utility
-]]
-
-function SWEP:Locomote(flipis, is, flipsp, spr)
-	if not (flipis or flipsp) then return end
-	if not (self:GetStatus() == TFA.Enum.STATUS_IDLE or (self:GetStatus() == TFA.Enum.STATUS_SHOOTING and not self.BoltAction)) then return end
-	local tldata = nil
-
-	if flipis then
-		if is and self.IronAnimation["in"] then
-			tldata = self.IronAnimation["in"] or tldata
-		elseif self.IronAnimation.out and not flipsp then
-			tldata = self.IronAnimation.out or tldata
+		if tval and tval > 0 then
+			return self:SendViewModelSeq(tval, 1, false, data.transition and self.Idle_Blend or self.Idle_Smooth)
 		end
 	end
-
-	if flipsp then
-		if spr and self.SprintAnimation["in"] then
-			tldata = self.SprintAnimation["in"] or tldata
-		elseif self.SprintAnimation.out and not flipis and not spr then
-			tldata = self.SprintAnimation.out or tldata
-		end
-	end
-
-	--self.Idle_WithHeld = true
-	if tldata then return self:PlayAnimation(tldata) end
-	--self:SetNextIdleAnim(-1)
-
 
 	return false, -1
 end
 
---[[
-Function Name:  ChooseDrawAnim
-Syntax: self:ChooseDrawAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.
-Purpose:  Animation / Utility
-]]
+function SWEP:Locomote(flipis, is, flipsp, spr)
+	if not (flipis or flipsp) then return end
+	local stat = self:GetStatus()
+	if not (stat == TFA.Enum.STATUS_IDLE or (stat == TFA.Enum.STATUS_SHOOTING and not self.BoltAction)) then return end
+
+	local tldata = nil
+
+	if flipis then
+		if is and self.IronAnimation and self.IronAnimation["in"] then
+			tldata = self.IronAnimation["in"]
+		elseif self.IronAnimation and self.IronAnimation.out and not flipsp then
+			tldata = self.IronAnimation.out
+		end
+	end
+
+	if flipsp then
+		if spr and self.SprintAnimation and self.SprintAnimation["in"] then
+			tldata = self.SprintAnimation["in"]
+		elseif self.SprintAnimation and self.SprintAnimation.out and not flipis and not spr then
+			tldata = self.SprintAnimation.out
+		end
+	end
+
+	if tldata then
+		return self:PlayAnimation(tldata)
+	end
+
+	return false, -1
+end
 
 function SWEP:ChooseDrawAnim()
 	if not self:VMIV() then return end
-	--self:ResetEvents()
-	tanim = ACT_VM_DRAW
-	success = true
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim
 
 	if self.SequenceEnabled[ACT_VM_DRAW_DEPLOYED] and not self:GetNW2Bool("Drawn") then
 		tanim = ACT_VM_DRAW_DEPLOYED
@@ -233,28 +321,23 @@ function SWEP:ChooseDrawAnim()
 
 	self:SendViewModelAnim(tanim)
 
-	return success, tanim
+	return true, tanim
 end
 
---[[
-Function Name:  ChooseInspectAnim
-Syntax: self:ChooseInspectAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseInspectAnim()
 	if not self:VMIV() then return end
-	--self:ResetEvents()
-	tanim = ACT_VM_FIDGET
-	success = true
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim = ACT_VM_FIDGET
+	local success = true
 
 	if self.SequenceEnabled[ACT_VM_FIDGET_EMPTY] and self.Primary.ClipSize > 0 and math.Round(self:Clip1()) == 0 then
 		tanim = ACT_VM_FIDGET_EMPTY
-	elseif self.InspectionActions then
-		math.randomseed(CurTime() + 1)
-		tanim = self.InspectionActions[math.random(1, #self.InspectionActions)]
+	elseif self.InspectionActions and #self.InspectionActions > 0 then
+		local idx = self:EntIndex()
+		local r = util.SharedRandom("tfa_inspect_" .. idx, 1, #self.InspectionActions + 0.999, CurTime())
+		local pick = math.Clamp(math.floor(r), 1, #self.InspectionActions)
+		tanim = self.InspectionActions[pick]
 	elseif self.SequenceEnabled[ACT_VM_FIDGET] then
 		tanim = ACT_VM_FIDGET
 	else
@@ -262,24 +345,15 @@ function SWEP:ChooseInspectAnim()
 		success = false
 	end
 
-	return self:SendViewModelAnim(tanim)
+	return self:SendViewModelAnim(tanim), success and tanim or tanim
 end
-
---[[
-Function Name:  ChooseHolsterAnim
-Syntax: self:ChooseHolsterAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.
-Purpose:  Animation / Utility
-]]
---
-ACT_VM_HOLSTER_SILENCED = ACT_VM_HOLSTER_SILENCED or ACT_CROSSBOW_HOLSTER_UNLOADED
 
 function SWEP:ChooseHolsterAnim()
 	if not self:VMIV() then return end
-	--self:ResetEvents()
-	tanim = ACT_VM_HOLSTER
-	success = true
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim
+	local success = true
 
 	if self:GetSilenced() and self.SequenceEnabled[ACT_VM_HOLSTER_SILENCED] then
 		tanim = ACT_VM_HOLSTER_SILENCED
@@ -297,14 +371,6 @@ function SWEP:ChooseHolsterAnim()
 	return success, tanim
 end
 
---[[
-Function Name:  ChooseProceduralReloadAnim
-Syntax: self:ChooseProceduralReloadAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Uses some holster code
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseProceduralReloadAnim()
 	if not self:VMIV() then return end
 
@@ -315,17 +381,13 @@ function SWEP:ChooseProceduralReloadAnim()
 	return true, ACT_VM_IDLE
 end
 
---[[
-Function Name:  ChooseReloadAnim
-Syntax: self:ChooseReloadAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseReloadAnim()
 	if not self:VMIV() then return false, 0 end
 	if self.ProceduralReloadEnabled then return false, 0 end
+
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim
 
 	if self.SequenceEnabled[ACT_VM_RELOAD_SILENCED] and self:GetSilenced() then
 		tanim = ACT_VM_RELOAD_SILENCED
@@ -336,9 +398,8 @@ function SWEP:ChooseReloadAnim()
 	end
 
 	local fac = 1
-
 	if self.Shotgun and self.ShellTime then
-		fac = self.ShellTime
+		fac = clamp_rate(self.ShellTime)
 	end
 
 	self.AnimCycle = 0
@@ -351,16 +412,11 @@ function SWEP:ChooseReloadAnim()
 	return self:SendViewModelAnim(tanim, fac, fac ~= 1)
 end
 
---[[
-Function Name:  ChooseReloadAnim
-Syntax: self:ChooseReloadAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseShotgunReloadAnim()
 	if not self:VMIV() then return end
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim
 
 	if self.SequenceEnabled[ACT_VM_RELOAD_SILENCED] and self:GetSilenced() then
 		tanim = ACT_VM_RELOAD_SILENCED
@@ -369,10 +425,8 @@ function SWEP:ChooseShotgunReloadAnim()
 	elseif self.SequenceEnabled[ACT_SHOTGUN_RELOAD_START] then
 		tanim = ACT_SHOTGUN_RELOAD_START
 	else
-		local _
-		_, tanim = self:ChooseIdleAnim()
-
-		return false, tanim
+		local _, idleact = self:ChooseIdleAnim()
+		return false, idleact
 	end
 
 	return self:SendViewModelAnim(tanim)
@@ -380,53 +434,49 @@ end
 
 function SWEP:ChooseShotgunPumpAnim()
 	if not self:VMIV() then return end
-	tanim = ACT_SHOTGUN_RELOAD_FINISH
-
-	return self:SendViewModelAnim(tanim)
+	return self:SendViewModelAnim(ACT_SHOTGUN_RELOAD_FINISH)
 end
-
-
---[[
-Function Name:  ChooseIdleAnim
-Syntax: self:ChooseIdleAnim().
-Returns:  True,  Which action?
-Notes:  Requires autodetection for full features.
-Purpose:  Animation / Utility
-]]
---
 
 local idleCV
 
 function SWEP:ChooseIdleAnim()
 	if not self:VMIV() then return end
+
 	if not idleCV then
 		idleCV = GetConVar("sv_tfa_net_idles")
 	end
 
-	if self.Idle_Mode ~= TFA.Enum.IDLE_BOTH and self.Idle_Mode ~= TFA.Enum.IDLE_ANI then return end
-
-	tanim = ACT_VM_IDLE
+	if self.Idle_Mode ~= TFA.Enum.IDLE_BOTH and self.Idle_Mode ~= TFA.Enum.IDLE_ANI then
+		return
+	end
 
 	if self:GetIronSights() then
 		if self.Sights_Mode == TFA.Enum.LOCOMOTION_LUA then
 			return self:ChooseFlatAnim()
-		else
-			return self:ChooseADSAnim()
 		end
+		return self:ChooseADSAnim()
 	elseif self:GetSprinting() and self.Sprint_Mode ~= TFA.Enum.LOCOMOTION_LUA then
 		return self:ChooseSprintAnim()
 	end
-	if self:GetNextIdleAnim() ~= -1 and not idleCV:GetBool() then return end
+
+	if self:GetNextIdleAnim() ~= -1 and idleCV and not idleCV:GetBool() then
+		return
+	end
+
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim
 
 	if self.SequenceEnabled[ACT_VM_IDLE_SILENCED] and self:GetSilenced() then
 		tanim = ACT_VM_IDLE_SILENCED
 	elseif (self.Primary.ClipSize > 0 and self:Clip1() == 0) or (self.Primary.ClipSize <= 0 and self:Ammo1() == 0) then
-		--self.SequenceEnabled( ACT_VM_IDLE_EMPTY ) and (self:Clip1() == 0) then
 		if self.SequenceEnabled[ACT_VM_IDLE_EMPTY] then
 			tanim = ACT_VM_IDLE_EMPTY
 		else
 			tanim = ACT_VM_IDLE
 		end
+	else
+		tanim = ACT_VM_IDLE
 	end
 
 	return self:SendViewModelAnim(tanim)
@@ -434,59 +484,49 @@ end
 
 function SWEP:ChooseFlatAnim()
 	if not self:VMIV() then return end
-	--self:ResetEvents()
-	tanim = ACT_VM_IDLE
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim = ACT_VM_IDLE
 
 	if self.SequenceEnabled[ACT_VM_IDLE_SILENCED] and self:GetSilenced() then
 		tanim = ACT_VM_IDLE_SILENCED
-	elseif self.SequenceEnabled[ACT_VM_IDLE_EMPTY] then
-		if (self:Clip1() == 0) then
-			tanim = ACT_VM_IDLE_EMPTY
-		else
-			self:SendViewModelAnim(ACT_VM_IDLE,0.00001)
-		end
+	elseif self.SequenceEnabled[ACT_VM_IDLE_EMPTY] and self:Clip1() == 0 then
+		tanim = ACT_VM_IDLE_EMPTY
 	end
-	self:SendViewModelAnim(tanim,0.00001)
 
+	self:SendViewModelAnim(tanim, 0.00001)
 	return true, tanim
 end
 
 function SWEP:ChooseADSAnim()
-	local succ, tan = self:PlayAnimation(self.IronAnimation.loop)
+	local succ, tan = self:PlayAnimation(self.IronAnimation and self.IronAnimation.loop)
 	if succ then
 		return succ, tan
-	else
-		return self:ChooseFlatAnim()
 	end
+	return self:ChooseFlatAnim()
 end
 
 function SWEP:ChooseSprintAnim()
-	self:PlayAnimation(self.SprintAnimation.loop)
-	return true,-1
+	self:PlayAnimation(self.SprintAnimation and self.SprintAnimation.loop)
+	return true, -1
 end
 
 function SWEP:ChooseWalkAnim()
 	if self.WalkAnimation and self.WalkAnimation.loop then
 		self:PlayAnimation(self.WalkAnimation.loop)
-		return true,-1
+		return true, -1
 	end
 
 	return self:ChooseFlatAnim()
 end
 
---[[
-Function Name:  ChooseShootAnim
-Syntax: self:ChooseShootAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseShootAnim(ifp)
 	ifp = ifp or IsFirstTimePredicted()
 	if not self:VMIV() then return end
 
-	if self:GetIronSights() and (self.Sights_Mode == TFA.Enum.LOCOMOTION_ANI or self.Sights_Mode == TFA.Enum.LOCOMOTION_HYBRID) and self.IronAnimation.shoot then
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	if self:GetIronSights() and (self.Sights_Mode == TFA.Enum.LOCOMOTION_ANI or self.Sights_Mode == TFA.Enum.LOCOMOTION_HYBRID) and self.IronAnimation and self.IronAnimation.shoot then
 		if self.LuaShellEject and ifp then
 			self:EventShell()
 		end
@@ -495,11 +535,11 @@ function SWEP:ChooseShootAnim(ifp)
 	end
 
 	if not self.BlowbackEnabled or (not self:GetIronSights() and self.Blowback_Only_Iron) then
-		success = true
-
 		if self.LuaShellEject then
 			self:MakeShellBridge(ifp)
 		end
+
+		local tanim
 
 		if self.SequenceEnabled[ACT_VM_PRIMARYATTACK_SILENCED] and self:GetSilenced() then
 			tanim = ACT_VM_PRIMARYATTACK_SILENCED
@@ -516,22 +556,21 @@ function SWEP:ChooseShootAnim(ifp)
 		end
 
 		self:SendViewModelAnim(tanim)
-
-		return success, tanim
-	else
-		if game.SinglePlayer() and SERVER then
-			self:CallOnClient("BlowbackFull", "")
-		end
-
-		if ifp then
-			self:BlowbackFull(ifp)
-		end
-
-		self:MakeShellBridge(ifp)
-		self:SendViewModelAnim(ACT_VM_BLOWBACK)
-
-		return true, ACT_VM_IDLE
+		return true, tanim
 	end
+
+	if game.SinglePlayer() and SERVER then
+		self:CallOnClient("BlowbackFull", "")
+	end
+
+	if ifp then
+		self:BlowbackFull(ifp)
+	end
+
+	self:MakeShellBridge(ifp)
+	self:SendViewModelAnim(ACT_VM_BLOWBACK)
+
+	return true, ACT_VM_IDLE
 end
 
 function SWEP:BlowbackFull()
@@ -541,19 +580,12 @@ function SWEP:BlowbackFull()
 	end
 end
 
---[[
-Function Name:  ChooseSilenceAnim
-Syntax: self:ChooseSilenceAnim( true if we're silencing, false for detaching the silencer).
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.  This is played when you silence or unsilence a gun.
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseSilenceAnim(val)
 	if not self:VMIV() then return end
-	--self:ResetEvents()
-	tanim = ACT_VM_PRIMARYATTACK
-	success = false
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim = ACT_VM_PRIMARYATTACK
+	local success = false
 
 	if val then
 		if self.SequenceEnabled[ACT_VM_ATTACH_SILENCER] then
@@ -570,48 +602,36 @@ function SWEP:ChooseSilenceAnim(val)
 	end
 
 	if not success then
-		local _
-		_, tanim = self:ChooseIdleAnim()
+		local _, idleact = self:ChooseIdleAnim()
+		tanim = idleact or tanim
 	end
 
 	return success, tanim
 end
 
---[[
-Function Name:  ChooseDryFireAnim
-Syntax: self:ChooseDryFireAnim().
-Returns:  Could we successfully find an animation?  Which action?
-Notes:  Requires autodetection or otherwise the list of valid anims.  set SWEP.ForceDryFireOff to false to properly use.
-Purpose:  Animation / Utility
-]]
---
 function SWEP:ChooseDryFireAnim()
 	if not self:VMIV() then return end
-	--self:ResetEvents()
-	tanim = ACT_VM_DRYFIRE
-	success = true
+	self.SequenceEnabled = self.SequenceEnabled or {}
+
+	local tanim = ACT_VM_DRYFIRE
+	local success = true
 
 	if self.SequenceEnabled[ACT_VM_DRYFIRE_SILENCED] and self:GetSilenced() and not self.ForceDryFireOff then
 		self:SendViewModelAnim(ACT_VM_DRYFIRE_SILENCED)
 		tanim = ACT_VM_DRYFIRE_SILENCED
-		--self:ChooseIdleAnim()
 	else
 		if self.SequenceEnabled[ACT_VM_DRYFIRE] and not self.ForceDryFireOff then
 			self:SendViewModelAnim(ACT_VM_DRYFIRE)
 			tanim = ACT_VM_DRYFIRE
 		else
 			success = false
-			local _
-			_, tanim = nil, nil
+			tanim = -1
 		end
 	end
 
 	return success, tanim
 end
 
-
---[[THIRDPERSON]]
---These holdtypes are used in ironsights.  Syntax:  DefaultHoldType=NewHoldType
 SWEP.IronSightHoldTypes = {
 	pistol = "revolver",
 	smg = "rpg",
@@ -632,7 +652,6 @@ SWEP.IronSightHoldTypes = {
 	revolver = "revolver"
 }
 
---These holdtypes are used while sprinting.  Syntax:  DefaultHoldType=NewHoldType
 SWEP.SprintHoldTypes = {
 	pistol = "normal",
 	smg = "passive",
@@ -653,7 +672,6 @@ SWEP.SprintHoldTypes = {
 	revolver = "normal"
 }
 
---These holdtypes are used in reloading.  Syntax:  DefaultHoldType=NewHoldType
 SWEP.ReloadHoldTypes = {
 	pistol = "pistol",
 	smg = "smg",
@@ -674,16 +692,15 @@ SWEP.ReloadHoldTypes = {
 	revolver = "revolver"
 }
 
---These holdtypes are used in reloading.  Syntax:  DefaultHoldType=NewHoldType
 SWEP.CrouchHoldTypes = {
 	ar2 = "ar2",
 	smg = "smg",
 	rpg = "ar2"
 }
 
-SWEP.IronSightHoldTypeOverride = "" --This variable overrides the ironsights holdtype, choosing it instead of something from the above tables.  Change it to "" to disable.
-SWEP.SprintHoldTypeOverride = "" --This variable overrides the sprint holdtype, choosing it instead of something from the above tables.  Change it to "" to disable.
-SWEP.ReloadHoldTypeOverride = "" --This variable overrides the reload holdtype, choosing it instead of something from the above tables.  Change it to "" to disable.
+SWEP.IronSightHoldTypeOverride = ""
+SWEP.SprintHoldTypeOverride = ""
+SWEP.ReloadHoldTypeOverride = ""
 
 local dynholdtypecvar = GetConVar("sv_tfa_holdtype_dynamic")
 
@@ -694,7 +711,6 @@ function SWEP:InitHoldType()
 
 	if not self.SprintHoldType then
 		self.SprintHoldType = self.SprintHoldTypes[self.DefaultHoldType] or "passive"
-
 		if self.SprintHoldTypeOverride and self.SprintHoldTypeOverride ~= "" then
 			self.SprintHoldType = self.SprintHoldTypeOverride
 		end
@@ -702,7 +718,6 @@ function SWEP:InitHoldType()
 
 	if not self.IronHoldType then
 		self.IronHoldType = self.IronSightHoldTypes[self.DefaultHoldType] or "rpg"
-
 		if self.IronSightHoldTypeOverride and self.IronSightHoldTypeOverride ~= "" then
 			self.IronHoldType = self.IronSightHoldTypeOverride
 		end
@@ -710,7 +725,6 @@ function SWEP:InitHoldType()
 
 	if not self.ReloadHoldType then
 		self.ReloadHoldType = self.ReloadHoldTypes[self.DefaultHoldType] or "ar2"
-
 		if self.ReloadHoldTypeOverride and self.ReloadHoldTypeOverride ~= "" then
 			self.ReloadHoldType = self.ReloadHoldTypeOverride
 		end
@@ -719,7 +733,6 @@ function SWEP:InitHoldType()
 	if not self.SetCrouchHoldType then
 		self.SetCrouchHoldType = true
 		self.CrouchHoldType = self.CrouchHoldTypes[self.DefaultHoldType]
-
 		if self.CrouchHoldTypeOverride and self.CrouchHoldTypeOverride ~= "" then
 			self.CrouchHoldType = self.CrouchHoldTypeOverride
 		end
@@ -727,13 +740,12 @@ function SWEP:InitHoldType()
 end
 
 function SWEP:ProcessHoldType()
-	local curhold, targhold
-	curhold = self:GetHoldType()
-	targhold = self.DefaultHoldType
+	local curhold = self:GetHoldType()
+	local targhold = self.DefaultHoldType
 	local stat = self:GetStatus()
 
-	if dynholdtypecvar:GetBool() then
-		if self:OwnerIsValid() and self:GetOwner():Crouching() then
+	if dynholdtypecvar and dynholdtypecvar:GetBool() then
+		if self:OwnerIsValid() and self:GetOwner():Crouching() and self.CrouchHoldType then
 			targhold = self.CrouchHoldType
 		else
 			if self:GetIronSights() then
@@ -748,7 +760,7 @@ function SWEP:ProcessHoldType()
 		end
 	end
 
-	if targhold ~= curhold then
-		self:SetHoldType(targhold or curhold)
+	if targhold and targhold ~= curhold then
+		self:SetHoldType(targhold)
 	end
 end

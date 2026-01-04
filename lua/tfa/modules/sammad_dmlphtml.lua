@@ -2,20 +2,28 @@ if SERVER then AddCSLuaFile() return end
 
 local pairs = pairs
 local isstring = isstring
+local typeFn = type
+local tostring = tostring
+
 local table_insert = table.insert
+local table_remove = table.remove
 local table_concat = table.concat
 local hook_Add = hook.Add
+
 local gui_EnableScreenClicker = gui.EnableScreenClicker
 local gui_InternalCursorMoved = gui.InternalCursorMoved
 local gui_InternalMousePressed = gui.InternalMousePressed
 local gui_InternalMouseReleased = gui.InternalMouseReleased
+
 local RealTime = RealTime
 local MsgC = MsgC
-local Color = Color
+local ColorFn = Color
 local input_GetCursorPos = input.GetCursorPos
 local math_Round = math.Round
 local vgui_GetWorldPanel = vgui.GetWorldPanel
-local unpack = unpack
+
+local unpackFn = unpack or table.unpack
+local surface_PlaySound = surface and surface.PlaySound
 
 local JS_CallbackHack = [[(function(){
     var funcname = '%s';
@@ -31,16 +39,17 @@ local PANEL = {}
 DEFINE_BASECLASS("Panel")
 
 function PANEL:Init()
-    self.JS = {}
+    self.JS = nil
     self.Callbacks = {}
     self.MouseActions = {}
     self.URL = "about:blank"
+    self._loading = false
+    self._nextUrlPoll = 0
+    self._inThink = false
 
-    local consoleFuncs = {"log", "error", "debug", "warn", "info"}
-
+    local consoleFuncs = { "log", "error", "debug", "warn", "info" }
     for i = 1, #consoleFuncs do
         local func = consoleFuncs[i]
-
         self:AddFunction("console", func, function(param)
             self:ConsoleMessage(param, func)
         end)
@@ -56,16 +65,19 @@ function PANEL:Init()
 end
 
 function PANEL:Think()
-    local loading = self:IsLoading()
+    if self._inThink then return end
+    self._inThink = true
 
-    if loading then
+    local isLoading = self:IsLoading()
+    if isLoading then
         if not self._loading then
-            self:FetchPageURL()
             self._loading = true
+            self:FetchPageURL()
             self:OnStartLoading()
         end
     else
         if self._loading then
+            self._loading = false
             self:FetchPageURL()
 
             local callbacksWindow = self.Callbacks.window
@@ -75,26 +87,26 @@ function PANEL:Think()
                 end
             end
 
-            self._loading = nil
             self:OnFinishLoading()
         end
 
         local jsQueue = self.JS
         if jsQueue then
-            for _, v in pairs(jsQueue) do
-                self:RunJavascript(v)
+            for i = 1, #jsQueue do
+                self:RunJavascript(jsQueue[i])
+                jsQueue[i] = nil
             end
-
             self.JS = nil
         end
     end
 
     local now = RealTime()
-
-    if not self._nextUrlPoll or self._nextUrlPoll < now then
+    if self._nextUrlPoll < now then
         self:FetchPageURL()
         self._nextUrlPoll = now + 1
     end
+
+    self._inThink = false
 end
 
 function PANEL:FetchPageURL()
@@ -106,12 +118,11 @@ function PANEL:GetURL()
 end
 
 function PANEL:SetURL(url)
+    if not url then url = "about:blank" end
     local current = self.URL
-
     if current ~= url then
         self:OnURLChanged(url, current)
     end
-
     self.URL = url
 end
 
@@ -124,7 +135,7 @@ function PANEL:SetSize(w, h, fullscreen)
 
     if fullscreen then
         local cw, ch = self:GetSize()
-        self._OrigSize = {w = cw, h = ch}
+        self._OrigSize = { w = cw, h = ch }
         self:ParentToHUD()
     elseif self._OrigSize then
         w = self._OrigSize.w
@@ -159,12 +170,20 @@ function PANEL:OnFinishLoading()
 end
 
 function PANEL:QueueJavascript(js)
+    if not js or js == "" then return end
+
     if not (self.JS or self:IsLoading()) then
-        return self:RunJavascript(js)
+        self:RunJavascript(js)
+        return
     end
 
-    self.JS = self.JS or {}
-    table_insert(self.JS, js)
+    local q = self.JS
+    if not q then
+        q = {}
+        self.JS = q
+    end
+
+    q[#q + 1] = js
     self:Think()
 end
 
@@ -172,35 +191,37 @@ PANEL.QueueJavaScript = PANEL.QueueJavascript
 PANEL.Call = PANEL.QueueJavascript
 
 PANEL.ConsoleColors = {
-    default = Color(255, 160, 255),
-    text = Color(255, 255, 255),
-    error = Color(235, 57, 65),
-    warn = Color(227, 181, 23),
-    info = Color(100, 173, 229)
+    default = ColorFn(255, 160, 255),
+    text = ColorFn(255, 255, 255),
+    error = ColorFn(235, 57, 65),
+    warn = ColorFn(227, 181, 23),
+    info = ColorFn(100, 173, 229)
 }
 
 function PANEL:ConsoleMessage(...)
     local filterLevel = FilterCVar:GetInt()
-    local args = {...}
+    local args = { ... }
     local msg = args[1]
 
     if #args == 3 and filterLevel > FILTER_ALL then
         local script = args[2]
         local linenum = args[3]
-        local col = self.ConsoleColors.error
-        local out = {"[JavaScript]", msg, ",", script, ":", linenum, "\n"}
-
-        MsgC(col, table_concat(out, " "))
+        local out = { "[JavaScript]", msg, ",", script, ":", linenum, "\n" }
+        MsgC(self.ConsoleColors.error, table_concat(out, " "))
         return
     end
 
     if not isstring(msg) then
-        msg = "*js variable* (" .. type(msg) .. ": " .. tostring(msg) .. ")"
+        msg = "*js variable* (" .. typeFn(msg) .. ": " .. tostring(msg) .. ")"
     end
 
     if msg:StartWith("PLAY:") then
-        local soundpath = msg:sub(7)
-        surface.PlaySound(soundpath)
+        if surface_PlaySound then
+            local soundpath = msg:sub(7)
+            if soundpath and soundpath ~= "" then
+                surface_PlaySound(soundpath)
+            end
+        end
         return
     end
 
@@ -217,7 +238,6 @@ function PANEL:ConsoleMessage(...)
         if colorOverride then
             prefixColor = colorOverride
         end
-
         prefix = prefix .. ":" .. func:upper()
     end
 
@@ -237,28 +257,26 @@ function PANEL:OnCallback(obj, func, args)
     obj = JSObjects[obj] or obj
 
     local callbacks = self.Callbacks[obj]
-    if not callbacks then
-        return
-    end
+    if not callbacks then return end
 
     local f = callbacks[func]
     if f then
-        return f(unpack(args))
+        return f(unpackFn(args))
     end
 end
 
 function PANEL:AddFunction(obj, funcname, func)
-    if obj == "this" then
-        obj = "window"
-    end
+    if obj == "this" then obj = "window" end
 
-    if not self.Callbacks[obj] then
+    local cb = self.Callbacks[obj]
+    if not cb then
         self:NewObject(obj)
-        self.Callbacks[obj] = {}
+        cb = {}
+        self.Callbacks[obj] = cb
     end
 
     self:NewObjectCallback(JSObjects[obj] or obj, funcname)
-    self.Callbacks[obj][funcname] = func
+    cb[funcname] = func
 end
 
 local JS_RemoveScrollbars = "document.body.style.overflow = 'hidden';"
@@ -278,28 +296,21 @@ function PANEL:HUDPaint()
 end
 
 function PANEL:InjectMouseClick(x, y)
-    if self._handlingMouseAction then
-        return
-    end
+    if self._handlingMouseAction then return end
 
     local w, h = self:GetSize()
-
-    table_insert(
-        self.MouseActions,
-        {
-            x = math_Round(x * w),
-            y = math_Round(y * h),
-            tick = 0
-        }
-    )
+    self.MouseActions[#self.MouseActions + 1] = {
+        x = math_Round((x or 0) * w),
+        y = math_Round((y or 0) * h),
+        tick = 0
+    }
 end
 
 function PANEL:HandleMouseActions()
-    if #self.MouseActions == 0 then
-        return
-    end
+    local actions = self.MouseActions
+    if #actions == 0 then return end
 
-    local action = self.MouseActions[1]
+    local action = actions[1]
     action.tick = action.tick + 1
 
     if action.tick == 1 then
@@ -309,20 +320,27 @@ function PANEL:HandleMouseActions()
         self:MakePopup()
         gui_EnableScreenClicker(true)
         gui_InternalCursorMoved(0, 0)
-    elseif action.tick == 2 then
+        return
+    end
+
+    if action.tick == 2 then
         local cx, cy = input_GetCursorPos()
         gui_InternalCursorMoved(cx, cy)
-    elseif action.tick == 3 then
+        return
+    end
+
+    if action.tick == 3 then
         gui_InternalMousePressed(MOUSE_LEFT)
         gui_InternalMouseReleased(MOUSE_LEFT)
-    elseif action.tick > 3 then
-        gui_EnableScreenClicker(false)
-        self:SetKeyboardInputEnabled(false)
-        self:SetMouseInputEnabled(false)
-        self:SetZPos(-32768)
-        table_remove(self.MouseActions, 1)
-        self._handlingMouseAction = nil
+        return
     end
+
+    gui_EnableScreenClicker(false)
+    self:SetKeyboardInputEnabled(false)
+    self:SetMouseInputEnabled(false)
+    self:SetZPos(-32768)
+    table_remove(actions, 1)
+    self._handlingMouseAction = false
 end
 
 function PANEL:MoveToCursor(xoffset, yoffset)
