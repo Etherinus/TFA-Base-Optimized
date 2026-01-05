@@ -6,28 +6,30 @@ TFA_Base_Particles = TFA_Base_Particles or {
     DUMMY_TFA_SMOKE = "tfa_smoke"
 }
 
-local addedparts = addedparts or {}
-local cachedparts = cachedparts or {}
+local addedparts = {}
+local cachedparts = {}
 
 local pairs = pairs
 local string_find = string.find
 local string_lower = string.lower
-local file_Exists = file and file.Exists
-local game_AddParticles = game and game.AddParticles
+local string_sub = string.sub
+local file_Find = file.Find
+local file_Exists = file.Exists
+local game_AddParticles = game.AddParticles
 local PrecacheParticleSystem = PrecacheParticleSystem
-local hook_Add = hook and hook.Add
+local hook_Add = hook.Add
 
 local function addParticleFile(pcfName)
-    if not (pcfName and file_Exists and game_AddParticles) then
-        return false
-    end
+    if not pcfName then return false end
 
     local key = string_lower(pcfName)
+
     if addedparts[key] then
         return true
     end
 
     local path = "particles/" .. pcfName .. ".pcf"
+
     if not file_Exists(path, "GAME") then
         return false
     end
@@ -39,17 +41,8 @@ local function addParticleFile(pcfName)
 end
 
 local function precacheIfPresent(name)
-    if not name then
-        return false
-    end
-
-    if cachedparts[name] ~= nil then
+    if not name or cachedparts[name] ~= nil then
         return cachedparts[name]
-    end
-
-    if not PrecacheParticleSystem then
-        cachedparts[name] = false
-        return false
     end
 
     local ok = PrecacheParticleSystem(name)
@@ -76,8 +69,6 @@ local function TFA_Initialize_Particles()
     end
 end
 
-if hook_Add then
-    hook_Add("InitPostEntity", "TFA_Initialize_Particles", TFA_Initialize_Particles)
-end
+hook_Add("InitPostEntity", "TFA_Initialize_Particles", TFA_Initialize_Particles)
 
 TFA_Initialize_Particles()

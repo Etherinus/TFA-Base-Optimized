@@ -5,20 +5,12 @@ local math_Clamp = math.Clamp
 local math_pow = math.pow
 local string_find = string.find
 local string_lower = string.lower
-local weapons_GetStored = weapons and weapons.GetStored
-local weapons_GetList = weapons and weapons.GetList
+local weapons_GetStored = weapons.GetStored
+local weapons_GetList = weapons.GetList
 local pairs = pairs
 local IsValid = IsValid
-local Vector = Vector
-local hook_Add = hook and hook.Add
-local game_SinglePlayer = game and game.SinglePlayer
 
-local cv_m9c
-if CreateConVar then
-    cv_m9c = CreateConVar("sv_tfa_conv_m9konvert", "0", { FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_SERVER_CAN_EXECUTE }, "Convert M9K to TFA at runtime?")
-else
-    cv_m9c = { GetBool = function() return false end }
-end
+local cv_m9c = CreateConVar("sv_tfa_conv_m9konvert", "0", { FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_SERVER_CAN_EXECUTE }, "Convert M9K to TFA at runtime?")
 
 function TFABaseConv_DefaultInitialize(self)
     if self.Callback and self.Callback.Initialize then
@@ -28,13 +20,8 @@ function TFABaseConv_DefaultInitialize(self)
         end
     end
 
-    self.Primary = self.Primary or {}
-    self.Secondary = self.Secondary or {}
-
     if (not self.Primary.Damage) or (self.Primary.Damage <= 0.01) then
-        if self.AutoDetectDamage then
-            self:AutoDetectDamage()
-        end
+        self:AutoDetectDamage()
     end
 
     if not self.Primary.IronAccuracy then
@@ -47,83 +34,40 @@ function TFABaseConv_DefaultInitialize(self)
 
     if self.Akimbo then
         self.AutoDetectMuzzleAttachment = true
-        self.MuzzleAttachmentRaw = 2 - (self.AnimCycle or 0)
+        self.MuzzleAttachmentRaw = 2 - self.AnimCycle
     end
 
-    if self.CreateFireModes then
-        self:CreateFireModes()
-    end
-
-    if self.AutoDetectMuzzle then
-        self:AutoDetectMuzzle()
-    end
-
-    if self.AutoDetectRange then
-        self:AutoDetectRange()
-    end
+    self:CreateFireModes()
+    self:AutoDetectMuzzle()
+    self:AutoDetectRange()
 
     self.DefaultHoldType = self.HoldType
     self.ViewModelFOVDefault = self.ViewModelFOV
     self.DrawCrosshairDefault = self.DrawCrosshair
 
-    if self.SetUpSpread then
-        self:SetUpSpread()
-    end
-
-    if self.CorrectScopeFOV then
-        local owner = self.Owner or self:GetOwner()
-        local fov = self.DefaultFOV or (IsValid(owner) and owner:GetFOV() or 90)
-        self:CorrectScopeFOV(fov)
-    end
+    self:SetUpSpread()
+    self:CorrectScopeFOV(self.DefaultFOV or (IsValid(self.Owner) and self.Owner:GetFOV() or 90))
 
     if CLIENT then
-        if self.InitMods then
-            self:InitMods()
-        end
-        if self.IconFix then
-            self:IconFix()
-        end
+        self:InitMods()
+        self:IconFix()
     end
 
     self.drawcount = 0
     self.drawcount2 = 0
     self.canholster = false
 
-    if self.DetectValidAnimations then
-        self:DetectValidAnimations()
-    end
-
-    if self.SetDeploySpeed then
-        local seq = self.SequenceLength
-        local drawLen = (seq and seq[ACT_VM_DRAW]) or 0.3
-        if drawLen <= 0 then drawLen = 0.3 end
-        self:SetDeploySpeed(0.3 / drawLen)
-    end
-
-    if self.ResetEvents then
-        self:ResetEvents()
-    end
-
-    if self.DoBodyGroups then
-        self:DoBodyGroups()
-    end
-
-    if self.InitAttachments then
-        self:InitAttachments()
-    end
+    self:DetectValidAnimations()
+    self:SetDeploySpeed(0.3 / (self.SequenceLength[ACT_VM_DRAW] or 0.3))
+    self:ResetEvents()
+    self:DoBodyGroups()
+    self:InitAttachments()
 
     self.IsHolding = false
     self.ViewModelFlipDefault = self.ViewModelFlip
-
-    if self.SetDrawing then
-        self:SetDrawing(true)
-    end
-
-    if self.ProcessHoldType then
-        self:ProcessHoldType()
-    end
-
-    sp = game_SinglePlayer and game_SinglePlayer() or false
+    self:SetDrawing(true)
+    self:ProcessHoldType()
+    sp = game.SinglePlayer()
 end
 
 function TFABaseConv_IsScoped(tbl)
@@ -278,7 +222,6 @@ tfa_conv_overrides = tfa_conv_overrides or {
     },
     halo5swepbattlerifle = {
         Initialize = function(self)
-            self.Primary = self.Primary or {}
             self.Primary.Automatic = true
             self.OnlyBurstFire = true
             self.Primary.RPM = 650
@@ -304,7 +247,6 @@ tfa_conv_overrides = tfa_conv_overrides or {
     },
     halo5swepbrwoodland = {
         Initialize = function(self)
-            self.Primary = self.Primary or {}
             self.Primary.Automatic = true
             self.OnlyBurstFire = true
             self.Primary.RPM = 650
@@ -385,15 +327,12 @@ function TFABaseConv_ism9k(tbl)
             end
         end
     end
+
     return false
 end
 
 local function tfaconvsingle_M9K(cn)
-    if not (cv_m9c and cv_m9c.GetBool and cv_m9c:GetBool()) then
-        return false
-    end
-
-    if not weapons_GetStored then
+    if not cv_m9c:GetBool() then
         return false
     end
 
@@ -405,9 +344,6 @@ local function tfaconvsingle_M9K(cn)
     if not TFABaseConv_ism9k(tbl) then
         return false
     end
-
-    tbl.Primary = tbl.Primary or {}
-    tbl.Secondary = tbl.Secondary or {}
 
     local base = tbl.Base
     local isshotgun = false
@@ -423,11 +359,25 @@ local function tfaconvsingle_M9K(cn)
         tbl.Base = "tfa_gun_base"
     end
 
-    tbl.SetIronsights = function() return false end
-    tbl.GetIronsights = function() return false end
-    tbl.SetRunsights = function() return false end
-    tbl.GetRunsights = function() return false end
-    tbl.IronSight = function() return false end
+    tbl.SetIronsights = function()
+        return false
+    end
+
+    tbl.GetIronsights = function()
+        return false
+    end
+
+    tbl.SetRunsights = function()
+        return false
+    end
+
+    tbl.GetRunsights = function()
+        return false
+    end
+
+    tbl.IronSight = function()
+        return false
+    end
 
     tbl.FireModes = nil
 
@@ -454,9 +404,9 @@ local function tfaconvsingle_M9K(cn)
 
     tbl.Revolver = TFABaseConv_IsRevolver(tbl)
 
-    if not isshotgun and not tbl.BoltAction and not tbl.Revolver and Vector then
+    if not isshotgun and not tbl.BoltAction and not tbl.Revolver then
         tbl.BlowbackEnabled = true
-        tbl.BlowbackVector = Vector(0, -((tbl.KickUp or tbl.Primary.KickUp or 0.5) * 3), 0)
+        tbl.BlowbackVector = Vector(0, -(tbl.KickUp or 0.5) * 3, 0)
 
         local ammoKey = tbl.Primary.Ammo or "default"
         tbl.Blowback_Shell_Effect = ammoshelleffects[ammoKey] or ammoshelleffects.default
@@ -468,19 +418,15 @@ local function tfaconvsingle_M9K(cn)
         tbl.Primary.Spread = 0.02
     end
 
-    local spread = tbl.Primary.Spread
-    if spread <= 0 then spread = 0.02 end
-
     local dmg = tbl.Primary.Damage or 30
     local rpm = tbl.Primary.RPM or 600
-    if rpm <= 0 then rpm = 600 end
 
-    local multBase = math_pow((dmg / 35) * 2, 0.25) * 5
-    tbl.Primary.SpreadMultiplierMax = math_Clamp(multBase, 0.01 / spread, 0.1 / spread)
+    local multBase = math_pow((dmg / 35) * 10 / 5, 0.25) * 5
+    tbl.Primary.SpreadMultiplierMax = math_Clamp(multBase, 0.01 / tbl.Primary.Spread, 0.1 / tbl.Primary.Spread)
     tbl.Primary.SpreadIncrement = tbl.Primary.SpreadMultiplierMax * 60 / rpm * 0.85 * 1.5
     tbl.Primary.SpreadRecovery = tbl.Primary.SpreadMultiplierMax * math_pow(rpm / 600, 1 / 3) * 0.75
 
-    local ovr = tfa_conv_overrides and tfa_conv_overrides[cn]
+    local ovr = tfa_conv_overrides[cn]
     if ovr then
         for k, v in pairs(ovr) do
             tbl[k] = v
@@ -491,7 +437,7 @@ local function tfaconvsingle_M9K(cn)
 end
 
 function tfa_m9k_main()
-    if not weapons_GetList or not weapons_GetStored then
+    if not weapons then
         return
     end
 
@@ -501,17 +447,14 @@ function tfa_m9k_main()
     end
 
     for _, v in pairs(weaponlist) do
-        local cn = v and v.ClassName
-        if cn and not string_find(cn, "_base", 1, true) then
-            tfaconvsingle_M9K(cn)
+        if v and v.ClassName and not string_find(v.ClassName, "_base", 1, true) then
+            tfaconvsingle_M9K(v.ClassName)
         end
     end
 end
 
-if hook_Add then
-    hook_Add("InitPostEntity", "TFA_M9KConv", function()
-        tfa_m9k_main()
-    end)
-end
+hook.Add("InitPostEntity", "TFA_M9KConv", function()
+    tfa_m9k_main()
+end)
 
 tfa_m9k_main()

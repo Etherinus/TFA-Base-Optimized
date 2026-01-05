@@ -1,36 +1,34 @@
 TFA = TFA or {}
 
-local hook_Add = hook.Add
-local hook_Remove = hook.Remove
-local hook_Run = hook.Run
-local hook_Call = hook.Call
-local LocalPlayer = LocalPlayer
+local string = string
+local math = math
+local table = table
+local ipairs = ipairs
+local http = http
+local hook = hook
+local CurTime = CurTime
 local IsValid = IsValid
-local typeFn = type
+local LocalPlayer = LocalPlayer
+local type = type
 
-hook_Add("HUDPaint", "TFA_TRIGGERCLIENTLOAD", function()
+hook.Add("HUDPaint", "TFA_TRIGGERCLIENTLOAD", function()
     local lp = LocalPlayer()
-    if not IsValid(lp) then return end
-
-    if hook_Run then
-        hook_Run("TFA_ClientLoad")
-    else
-        hook_Call("TFA_ClientLoad", GAMEMODE)
+    if IsValid(lp) then
+        hook.Call("TFA_ClientLoad")
+        hook.Remove("HUDPaint", "TFA_TRIGGERCLIENTLOAD")
     end
-
-    hook_Remove("HUDPaint", "TFA_TRIGGERCLIENTLOAD")
 end)
 
-local function safe_cb(cb, ...)
-    if typeFn(cb) == "function" then
+local function noop_callback(cb, ...)
+    if type(cb) == "function" then
         cb(...)
     end
 end
 
 function TFA.GetGroupMembers(groupname, callback)
-    safe_cb(callback, {})
+    noop_callback(callback, {})
 end
 
 function TFA.GetUserInGroup(groupname, steamid64, callback)
-    safe_cb(callback, false)
+    noop_callback(callback, false)
 end

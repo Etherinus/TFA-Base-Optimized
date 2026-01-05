@@ -1,11 +1,10 @@
-local sp = game.SinglePlayer()
-local l_CT = CurTime
-local l_FrameNumber = FrameNumber
+local oiv = nil
 
 local function L(key)
 	if TFA and TFA.GetLangString then
 		return TFA.GetLangString(key)
 	end
+
 	return key
 end
 
@@ -14,94 +13,61 @@ function SWEP:NZAnimationSpeed()
 end
 
 function SWEP:GetSeed()
-	local c1 = tonumber(self:Clip1()) or 0
-	local a1 = tonumber(self:Ammo1()) or 0
-	local c2 = tonumber(self:Clip2()) or 0
-	local a2 = tonumber(self:Ammo2()) or 0
-	local la = tonumber(self:GetLastActivity()) or 0
-	local nia = tonumber(self:GetNextIdleAnim()) or 0
-	local npf = tonumber(self:GetNextPrimaryFire()) or 0
-	local nsf = tonumber(self:GetNextSecondaryFire()) or 0
+	local sd = math.floor(self:Clip1() + self:Ammo1() + self:Clip2() + self:Ammo2() + self:GetLastActivity()) + self:GetNextIdleAnim() + self:GetNextPrimaryFire() + self:GetNextSecondaryFire()
 
-	local sd = math.floor(c1 + a1 + c2 + a2 + la) + nia + npf + nsf
 	return math.Round(sd)
 end
 
 function SWEP:Get3DSensitivity()
-	local sec = self.Secondary or {}
-	local zoom = tonumber(sec.ScopeZoom) or 0
-	if zoom > 0 then
-		return math.sqrt(1 / zoom)
+	if self.Secondary.ScopeZoom then
+		return math.sqrt(1 / self.Secondary.ScopeZoom)
+	else
+		return math.sqrt(90 / self.Secondary.IronFOV)
 	end
-
-	local fov = tonumber(sec.IronFOV) or 90
-	if fov <= 0 then fov = 90 end
-	return math.sqrt(90 / fov)
 end
 
-SWEP.StatusLengthOverride = SWEP.StatusLengthOverride or {}
-SWEP.SequenceLengthOverride = SWEP.SequenceLengthOverride or {}
+SWEP.StatusLengthOverride = {}
+SWEP.SequenceLengthOverride = {}
+
+local slo, sqlo
 
 function SWEP:GetActivityLength(tanim, status)
 	if not self:VMIV() then return 0 end
 
-	local vm = self.OwnerViewModel
-	if not IsValid(vm) then return 0 end
+	tanim = tanim or self:GetLastActivity()
+	if tanim < 0 then return 0 end
+	nm = self.OwnerViewModel:GetSequenceName(self.OwnerViewModel:SelectWeightedSequence(tanim))
 
-	tanim = tonumber(tanim) or self:GetLastActivity()
-	if not tanim or tanim < 0 then return 0 end
-
-	local seq
-	if tanim == vm:GetSequenceActivity(vm:GetSequence()) then
-		seq = vm:GetSequence()
+	if tanim == self.OwnerViewModel:GetSequenceActivity(self.OwnerViewModel:GetSequence()) then
+		sqlen = self.OwnerViewModel:SequenceDuration(self.OwnerViewModel:GetSequence())
 	else
-		seq = vm:SelectWeightedSequenceSeeded(math.max(tanim, 1), self:GetSeed())
+		sqlen = self.OwnerViewModel:SequenceDuration(self.OwnerViewModel:SelectWeightedSequenceSeeded(math.max(tanim or 1, 1), self:GetSeed()))
 	end
 
-	local nm = vm:GetSequenceName(seq)
-	local sqlen = vm:SequenceDuration(seq)
-
-	local slo = self.StatusLengthOverride[nm] or self.StatusLengthOverride[tanim]
-	local sqlo = self.SequenceLengthOverride[nm] or self.SequenceLengthOverride[tanim]
+	slo = self.StatusLengthOverride[nm] or self.StatusLengthOverride[tanim]
+	sqlo = self.SequenceLengthOverride[nm] or self.SequenceLengthOverride[tanim]
 
 	if status and slo then
 		sqlen = slo
 	elseif sqlo then
 		sqlen = sqlo
 	end
-
-	return sqlen or 0
+	return sqlen
 end
 
 function SWEP:ClearStatCache()
-	self._stat_path_cache = nil
 end
 
-function SWEP:GetStat(stat, default)
-	if not stat or stat == "" then return default end
-
-	local cache = self._stat_path_cache
-	if not cache then
-		cache = {}
-		self._stat_path_cache = cache
-	end
-
-	local path = cache[stat]
-	if not path then
-		path = string.Explode(".", stat, false)
-		cache[stat] = path
-	end
-
+function SWEP:GetStat(stat)
+	local statTbl = string.Explode(".",stat,false)
 	local t = self
-	for i = 1, #path do
-		local k = path[i]
-		local v = t[k]
-		if v == nil then
-			return default
+	for _, st in ipairs(statTbl) do
+		if t[st] then
+			t = t[st]
+		else
+			return
 		end
-		t = v
 	end
-
 	return t
 end
 
@@ -110,64 +76,56 @@ function SWEP:ClearMaterialCache()
 end
 
 function SWEP:Unload()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return end
-
-	local amm = tonumber(self:Clip1()) or 0
-	if amm <= 0 then
-		self:SetClip1(0)
-		return
-	end
-
+	local amm = self:Clip1()
 	self:SetClip1(0)
-	if owner.GiveAmmo then
-		owner:GiveAmmo(amm, self:GetPrimaryAmmoType(), true)
+
+	if self.OwnerIsValid and self:OwnerIsValid() and self.Owner.GiveAmmo then
+		self.Owner:GiveAmmo(amm, self:GetPrimaryAmmoType(), true)
 	end
 end
 
-SWEP.Bodygroups_V = SWEP.Bodygroups_V or {}
-SWEP.Bodygroups_W = SWEP.Bodygroups_W or {}
+local bgt
+SWEP.Bodygroups_V = {}
+SWEP.Bodygroups_W = {}
 
 function SWEP:ProcessBodygroups()
 	if not self.HasFilledBodygroupTables then
 		if self:VMIV() then
-			local vm = self.OwnerViewModel
-			if IsValid(vm) and vm.GetNumBodyGroups then
-				local n = vm:GetNumBodyGroups() or 0
-				for i = 0, math.max(n - 1, 0) do
-					self.Bodygroups_V[i] = self.Bodygroups_V[i] or 0
-				end
+			for i = 0, #(self.OwnerViewModel:GetBodyGroups() or self.Bodygroups_V) do
+				self.Bodygroups_V[i] = self.Bodygroups_V[i] or 0
 			end
 		end
 
-		if self.GetNumBodyGroups then
-			local n = self:GetNumBodyGroups() or 0
-			for i = 0, math.max(n - 1, 0) do
-				self.Bodygroups_W[i] = self.Bodygroups_W[i] or 0
-			end
+		for i = 0, #(self:GetBodyGroups() or self.Bodygroups_W) do
+			self.Bodygroups_W[i] = self.Bodygroups_W[i] or 0
 		end
 
 		self.HasFilledBodygroupTables = true
 	end
 
 	if self:VMIV() then
-		local vm = self.OwnerViewModel
-		if IsValid(vm) then
-			local bgtv = self:GetStat("Bodygroups_V", self.Bodygroups_V) or self.Bodygroups_V
-			for k, v in pairs(bgtv) do
-				local idx = (type(k) == "string") and tonumber(k) or k
-				if idx and vm:GetBodygroup(idx) ~= v then
-					vm:SetBodygroup(idx, v)
-				end
+		bgt = self:GetStat("Bodygroups_V", self.Bodygroups_V)
+
+		for k, v in pairs(bgt) do
+			if type(k) == "string" then
+				k = tonumber(k)
+			end
+
+			if k and self.OwnerViewModel:GetBodygroup(k) ~= v then
+				self.OwnerViewModel:SetBodygroup(k, v)
 			end
 		end
 	end
 
-	local bgtw = self:GetStat("Bodygroups_W", self.Bodygroups_W) or self.Bodygroups_W
-	for k, v in pairs(bgtw) do
-		local idx = (type(k) == "string") and tonumber(k) or k
-		if idx and self:GetBodygroup(idx) ~= v then
-			self:SetBodygroup(idx, v)
+	bgt = self:GetStat("Bodygroups_W", self.Bodygroups_W)
+
+	for k, v in pairs(bgt) do
+		if type(k) == "string" then
+			k = tonumber(k)
+		end
+
+		if k and self:GetBodygroup(k) ~= v then
+			self:SetBodygroup(k, v)
 		end
 	end
 end
@@ -175,100 +133,84 @@ end
 local rlcv = GetConVar("sv_tfa_reloads_enabled")
 
 function SWEP:ReloadCV()
-	if not rlcv then return end
-	if not self.Primary then return end
-
-	if (not rlcv:GetBool()) and (not self.Primary.ClipSize_PreEdit) then
-		self.Primary.ClipSize_PreEdit = self.Primary.ClipSize
-		self.Primary.ClipSize = -1
-	elseif rlcv:GetBool() and self.Primary.ClipSize_PreEdit then
-		self.Primary.ClipSize = self.Primary.ClipSize_PreEdit
-		self.Primary.ClipSize_PreEdit = nil
+	if rlcv then
+		if ( not rlcv:GetBool() ) and (not self.Primary.ClipSize_PreEdit) then
+			self.Primary.ClipSize_PreEdit = self.Primary.ClipSize
+			self.Primary.ClipSize = -1
+		elseif rlcv:GetBool() and self.Primary.ClipSize_PreEdit then
+			self.Primary.ClipSize = self.Primary.ClipSize_PreEdit
+			self.Primary.ClipSize_PreEdit = nil
+		end
 	end
 end
 
 function SWEP:OwnerIsValid()
-	local fn
-	if l_FrameNumber then
-		fn = l_FrameNumber()
-	else
-		fn = math.floor(l_CT() * 100)
-	end
-
-	if self._oiv_fn ~= fn then
-		self._oiv_fn = fn
-		self._oiv_val = IsValid(self:GetOwner())
-	end
-
-	return self._oiv_val
+	if oiv == nil then oiv = IsValid(self.Owner) end
+	return oiv
 end
 
 function SWEP:NullifyOIV()
-	self._oiv_fn = nil
-	self._oiv_val = nil
+	oiv = nil
 	return self:VMIV()
 end
 
 function SWEP:VMIV()
 	if not IsValid(self.OwnerViewModel) then
-		local owner = self:GetOwner()
-		if IsValid(owner) and owner.GetViewModel then
-			self.OwnerViewModel = owner:GetViewModel()
+		if IsValid(self.Owner) and self.Owner.GetViewModel then
+			self.OwnerViewModel = self.Owner:GetViewModel()
 		end
 		return false
+	else
+		return self.OwnerViewModel
 	end
-	return self.OwnerViewModel
 end
 
 function SWEP:CanChamber()
 	if self.C_CanChamber ~= nil then
 		return self.C_CanChamber
-	end
+	else
+		self.C_CanChamber = not self.BoltAction and not self.Shotgun and not self.Revolver and not self.DisableChambering
 
-	self.C_CanChamber = not self.BoltAction and not self.Shotgun and not self.Revolver and not self.DisableChambering
-	return self.C_CanChamber
+		return self.C_CanChamber
+	end
 end
 
-function SWEP:GetPrimaryClipSize(calc)
-	local prim = self.Primary or {}
-	local targetclip = tonumber(prim.ClipSize) or -1
+function SWEP:GetPrimaryClipSize( calc )
+	targetclip = self.Primary.ClipSize
 
-	if targetclip >= 0 then
-		if self:CanChamber() and not (calc and (tonumber(self:Clip1()) or 0) <= 0) then
-			targetclip = targetclip + (self.Akimbo and 2 or 1)
-		end
+	if self:CanChamber() and not ( calc and self:Clip1() <= 0 ) then
+		targetclip = targetclip + ( self.Akimbo and 2 or 1)
 	end
 
-	return math.max(targetclip, -1)
+	return math.max(targetclip,-1)
 end
 
-function SWEP:TakePrimaryAmmo(num, pool)
-	num = tonumber(num) or 0
-	if num <= 0 then return end
+function SWEP:TakePrimaryAmmo( num, pool )
 
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return end
+	-- Doesn't use clips
+	if self.Primary.ClipSize < 0 or pool then
 
-	if (self.Primary and self.Primary.ClipSize or -1) < 0 or pool then
-		local a1 = tonumber(self:Ammo1()) or 0
-		if a1 <= 0 then return end
-		owner:RemoveAmmo(math.min(a1, num), self:GetPrimaryAmmoType())
+		if ( self:Ammo1() <= 0 ) then return end
+
+		self.Owner:RemoveAmmo( math.min( self:Ammo1(), num), self:GetPrimaryAmmoType() )
+
 		return
 	end
 
-	self:SetClip1(math.max((tonumber(self:Clip1()) or 0) - num, 0))
+	self:SetClip1( math.max(self:Clip1() - num,0) )
+
 end
 
 function SWEP:GetFireDelay()
-	local prim = self.Primary or {}
-	if self.GetMaxBurst and self:GetMaxBurst() > 1 and prim.RPM_Burst and prim.RPM_Burst > 0 then
-		return 60 / prim.RPM_Burst
-	elseif prim.RPM_Semi and not prim.Automatic and prim.RPM_Semi > 0 then
-		return 60 / prim.RPM_Semi
-	elseif prim.RPM and prim.RPM > 0 then
-		return 60 / prim.RPM
+	if self:GetMaxBurst() > 1 and self.Primary.RPM_Burst and self.Primary.RPM_Burst > 0 then
+		return 60 / self.Primary.RPM_Burst
+	elseif self.Primary.RPM_Semi and not self.Primary.Automatic and self.Primary.RPM_Semi and self.Primary.RPM_Semi > 0 then
+		return 60 / self.Primary.RPM_Semi
+	elseif self.Primary.RPM and self.Primary.RPM > 0 then
+		return 60 / self.Primary.RPM
+	else
+		return self.Primary.Delay or 0.1
 	end
-	return prim.Delay or 0.1
 end
 
 function SWEP:GetBurstDelay(bur)
@@ -276,52 +218,56 @@ function SWEP:GetBurstDelay(bur)
 		bur = self:GetMaxBurst()
 	end
 
-	bur = tonumber(bur) or 1
 	if bur <= 1 then return 0 end
-
-	local prim = self.Primary or {}
-	if prim.BurstDelay then return prim.BurstDelay end
+	if self.Primary.BurstDelay then return self.Primary.BurstDelay end
 
 	return self:GetFireDelay() * 3
 end
 
+--[[
+Function Name:  IsSafety
+Syntax: self:IsSafety( ).
+Returns:   Are we in safety firemode.
+Notes:    Non.
+Purpose:  Utility
+]]--
 function SWEP:IsSafety()
 	if not self.FireModes then return false end
 	local fm = self.FireModes[self:GetFireMode()] or self.FireModes[1]
 	local fmn = fm and string.lower(tostring(fm)) or ""
-	return (fmn == "safe" or fmn == "holster")
+
+	if fmn == "safe" or fmn == "holster" then
+		return true
+	else
+		return false
+	end
 end
 
 function SWEP:UpdateMuzzleAttachment()
 	if not self:VMIV() then return end
-
-	local vm = self.OwnerViewModel
+	vm = self.OwnerViewModel
 	if not IsValid(vm) then return end
-
 	self.MuzzleAttachmentRaw = nil
 
-	if not self.MuzzleAttachment then
-		self.MuzzleAttachment = "muzzle"
-	end
-
 	if not self.MuzzleAttachmentSilenced then
-		local has = vm:LookupAttachment("muzzle_silenced")
-		self.MuzzleAttachmentSilenced = (has and has > 0) and "muzzle_silenced" or self.MuzzleAttachment
+		self.MuzzleAttachmentSilenced = (vm:LookupAttachment("muzzle_silenced") <= 0) and self.MuzzleAttachment or "muzzle_silenced"
 	end
 
-	if self.GetSilenced and self:GetSilenced() and self.MuzzleAttachmentSilenced then
-		local raw = vm:LookupAttachment(self.MuzzleAttachmentSilenced)
-		if raw and raw > 0 then
-			self.MuzzleAttachmentRaw = raw
-			return
+	if self:GetSilenced() and self.MuzzleAttachmentSilenced then
+		self.MuzzleAttachmentRaw = vm:LookupAttachment(self.MuzzleAttachmentSilenced)
+
+		if not self.MuzzleAttachmentRaw or self.MuzzleAttachmentRaw <= 0 then
+			self.MuzzleAttachmentRaw = nil
 		end
 	end
 
-	local raw = vm:LookupAttachment(self.MuzzleAttachment)
-	if not raw or raw <= 0 then
-		raw = 1
+	if not self.MuzzleAttachmentRaw and self.MuzzleAttachment then
+		self.MuzzleAttachmentRaw = vm:LookupAttachment(self.MuzzleAttachment)
+
+		if not self.MuzzleAttachmentRaw or self.MuzzleAttachmentRaw <= 0 then
+			self.MuzzleAttachmentRaw = 1
+		end
 	end
-	self.MuzzleAttachmentRaw = raw
 end
 
 function SWEP:UpdateConDamage()
@@ -336,11 +282,24 @@ function SWEP:UpdateConDamage()
 	end
 end
 
+--[[
+Function Name:  IsCurrentlyScoped
+Syntax: self:IsCurrentlyScoped( ).
+Returns:   Is the player scoped in enough to display the overlay?  true/false, returns a boolean.
+Notes:    Change SWEP.ScopeOverlayThreshold to change when the overlay is displayed.
+Purpose:  Utility
+]]--
 function SWEP:IsCurrentlyScoped()
-	local thr = tonumber(self.ScopeOverlayThreshold) or 0.8
-	return (tonumber(self.IronSightsProgress) or 0) > thr and self.Scoped
+	return (self.IronSightsProgress > self.ScopeOverlayThreshold) and self.Scoped
 end
 
+--[[
+Function Name:  IsHidden
+Syntax: self:IsHidden( ).
+Returns:   Should we hide self?.
+Notes:
+Purpose:  Utility
+]]--
 function SWEP:GetHidden()
 	if not self:VMIV() then return true end
 	if self.DrawViewModel ~= nil and not self.DrawViewModel then return true end
@@ -348,69 +307,74 @@ function SWEP:GetHidden()
 	return self:IsCurrentlyScoped()
 end
 
+--[[
+Function Name:  IsFirstPerson
+Syntax: self:IsFirstPerson( ).
+Returns:   Is the owner in first person.
+Notes:    Broken in singplayer because gary.
+Purpose:  Utility
+]]--
 function SWEP:IsFirstPerson()
 	if not IsValid(self) or not self:OwnerIsValid() then return false end
+	if self.Owner.ShouldDrawLocalPlayer and self.Owner:ShouldDrawLocalPlayer() then return false end
+	local gmsdlp
 
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return false end
-
-	if SERVER then
-		if sp then return true end
-		return false
-	end
-
-	if owner.ShouldDrawLocalPlayer and owner:ShouldDrawLocalPlayer() then return false end
-
-	local gmsdlp = false
-	if hook and hook.Call then
-		gmsdlp = hook.Call("ShouldDrawLocalPlayer", GAMEMODE, owner) or false
+	if LocalPlayer then
+		gmsldp = hook.Call("ShouldDrawLocalPlayer", GAMEMODE, self.Owner)
+	else
+		gmsldp = false
 	end
 
 	if gmsdlp then return false end
 	return true
 end
 
+--[[
+Function Name:  GetMuzzlePos
+Syntax: self:GetMuzzlePos( hacky workaround that doesn't work anyways ).
+Returns:   The AngPos for the muzzle attachment.
+Notes:    Defaults to the first attachment, and uses GetFPMuzzleAttachment
+Purpose:  Utility
+]]--
+local fp
 function SWEP:GetMuzzlePos(ignorepos)
-	local fp = self:IsFirstPerson()
-
-	local vm = self.OwnerViewModel
+	fp = self:IsFirstPerson()
+	if not IsValid(vm) then
+		vm = self.OwnerViewModel
+	end
 	if not IsValid(vm) then
 		vm = self
 	end
 
-	local att = self.MuzzleAttachmentRaw
-	if not att or att <= 0 then
-		att = vm:LookupAttachment(self.MuzzleAttachment or "muzzle")
+	obj = self.MuzzleAttachmentRaw or vm:LookupAttachment(self.MuzzleAttachment)
+	obj = math.Clamp(obj or 1, 1, 128)
+
+	if fp then
+		muzzlepos = vm:GetAttachment(obj)
+	else
+		muzzlepos = self:GetAttachment(obj)
 	end
 
-	att = math.Clamp(att or 1, 1, 128)
-
-	if fp and IsValid(self.OwnerViewModel) then
-		return self.OwnerViewModel:GetAttachment(att)
-	end
-
-	return self:GetAttachment(att)
+	return muzzlepos
 end
 
 function SWEP:FindEvenBurstNumber()
-	local prim = self.Primary or {}
-	local cs = tonumber(prim.ClipSize) or 0
-	if cs == 0 then return nil end
-
-	if cs % 3 == 0 then
+	if (self.Primary.ClipSize % 3 == 0) then
 		return 3
-	elseif cs % 2 == 0 then
+	elseif (self.Primary.ClipSize % 2 == 0) then
 		return 2
-	end
+	else
+		local i = 4
 
-	local i = 4
-	while i <= 7 do
-		if cs % i == 0 then return i end
-		i = i + 1
+		while i <= 7 do
+			if self.Primary.ClipSize % i == 0 then return i end
+			i = i + 1
+		end
 	end
 
 	return nil
 end
+
 
 function SWEP:GetFireModeName()
 	local fm = self:GetFireMode()
@@ -419,44 +383,44 @@ function SWEP:GetFireModeName()
 		return L("hud_firemode_auto")
 	end
 
-	local fmn = string.lower(tostring(fireModeEntry))
+	local fmn = string.lower( tostring(fireModeEntry) )
 	if fmn == "safe" or fmn == "holster" then return L("hud_firemode_safety") end
 	if self.FireModeName then return L(self.FireModeName) end
 	if fmn == "auto" or fmn == "automatic" then return L("hud_firemode_full_auto") end
 
 	if fmn == "semi" or fmn == "single" then
 		if self.Revolver then
-			if self.BoltAction then
+			if (self.BoltAction) then
 				return L("hud_firemode_single_action")
+			else
+				return L("hud_firemode_double_action")
 			end
-			return L("hud_firemode_double_action")
+		else
+			if (self.BoltAction) then
+				return L("hud_firemode_bolt_action")
+			else
+				if (self.Shotgun and self.Primary.RPM < 250) then
+					return L("hud_firemode_pump_action")
+				else
+					return L("hud_firemode_semi_auto")
+				end
+			end
 		end
-
-		if self.BoltAction then
-			return L("hud_firemode_bolt_action")
-		end
-
-		if self.Shotgun and (self.Primary and self.Primary.RPM or 0) < 250 then
-			return L("hud_firemode_pump_action")
-		end
-
-		return L("hud_firemode_semi_auto")
 	end
 
-	local bpos = string.find(fmn, "burst", 1, true)
+	local bpos = string.find(fmn, "burst")
 	if bpos then
 		local count = string.Trim(string.sub(fmn, 1, bpos - 1))
 		return string.format(L("hud_firemode_burst"), count)
 	end
-
 	return ""
 end
 
-SWEP.BurstCountCache = SWEP.BurstCountCache or {}
+SWEP.BurstCountCache = {}
 
 function SWEP:GetMaxBurst()
 	local fm = self:GetFireMode() or 1
-	local cacheKey = fm
+	local cacheKey = fm or 1
 
 	if not self.BurstCountCache[cacheKey] then
 		local fmEntry
@@ -465,7 +429,7 @@ function SWEP:GetMaxBurst()
 		end
 
 		local fmn = fmEntry and string.lower(tostring(fmEntry)) or nil
-		local bpos = fmn and string.find(fmn, "burst", 1, true) or nil
+		local bpos = fmn and string.find(fmn, "burst") or nil
 		if bpos then
 			self.BurstCountCache[cacheKey] = tonumber(string.sub(fmn, 1, bpos - 1)) or 1
 		else
@@ -476,28 +440,40 @@ function SWEP:GetMaxBurst()
 	return self.BurstCountCache[cacheKey]
 end
 
+--[[
+Function Name:  CycleFireMode
+Syntax: self:CycleFireMode()
+Returns:  Nothing.
+Notes: Cycles to next firemode.
+Purpose:  Feature
+]]--
+local l_CT = CurTime
 function SWEP:CycleFireMode()
-	if not istable(self.FireModes) or #self.FireModes <= 1 then return end
+	local fm = self:GetFireMode()
+	fm = fm + 1
 
-	local fm = (self:GetFireMode() or 1) + 1
 	if fm >= #self.FireModes then
 		fm = 1
 	end
 
 	self:SetFireMode(fm)
 	self:EmitSound("Weapon_AR2.Empty")
-
-	local ct = l_CT()
-	self:SetNextPrimaryFire(ct + math.max(self:GetFireDelay(), 0.25))
-
+	self:SetNextPrimaryFire(l_CT() + math.max( self:GetFireDelay(), 0.25))
 	self.BurstCount = 0
+	--self:SetStatus(TFA.Enum.STATUS_FIREMODE)
+	--self:SetStatusEnd( self:GetNextPrimaryFire() )
 end
 
+--[[
+Function Name:  CycleSafety
+Syntax: self:CycleSafety()
+Returns:  Nothing.
+Notes: Toggles safety
+Purpose:  Feature
+]]--
 function SWEP:CycleSafety()
-	if not istable(self.FireModes) or #self.FireModes <= 0 then return end
-
-	local ct = l_CT()
-	local fm = self:GetFireMode() or 1
+	ct = l_CT()
+	local fm = self:GetFireMode()
 
 	if fm ~= #self.FireModes then
 		self.LastFireMode = fm
@@ -507,24 +483,32 @@ function SWEP:CycleSafety()
 	end
 
 	self:EmitSound("Weapon_AR2.Empty")
-	self:SetNextPrimaryFire(ct + math.max(self:GetFireDelay(), 0.25))
+	self:SetNextPrimaryFire(ct + math.max( self:GetFireDelay(), 0.25))
 	self.BurstCount = 0
+	--self:SetStatus(TFA.Enum.STATUS_FIREMODE)
+	--self:SetStatusEnd( self:GetNextPrimaryFire() )
 end
 
-function SWEP:ProcessFireMode()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return end
+--[[
+Function Name:  ProcessFireMode
+Syntax: self:ProcessFireMode()
+Returns:  Nothing.
+Notes: Processes fire mode changing and whether the swep is auto or not.
+Purpose:  Feature
+]]--
+local fm
+local sp = game.SinglePlayer()
 
-	if owner:KeyPressed(IN_RELOAD) and owner:KeyDown(IN_USE) and self:GetStatus() == TFA.Enum.STATUS_IDLE and (SERVER or not sp) then
-		if self.SelectiveFire and not owner:KeyDown(IN_SPEED) then
+function SWEP:ProcessFireMode()
+	if self.Owner:KeyPressed(IN_RELOAD) and self.Owner:KeyDown(IN_USE) and self:GetStatus() == TFA.Enum.STATUS_IDLE and ( SERVER or not sp ) then
+		if self.SelectiveFire and not self.Owner:KeyDown(IN_SPEED) then
 			self:CycleFireMode()
-		elseif owner:KeyDown(IN_SPEED) then
+		elseif self.Owner:KeyDown(IN_SPEED) then
 			self:CycleSafety()
 		end
 	end
 
-	local fm = self.FireModes and self.FireModes[self:GetFireMode()]
-	if not self.Primary then self.Primary = {} end
+	fm = self.FireModes[self:GetFireMode()]
 
 	if fm == "Automatic" or fm == "Auto" then
 		self.Primary.Automatic = true

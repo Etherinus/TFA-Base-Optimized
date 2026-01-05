@@ -1,50 +1,51 @@
-local fx
-local sp = game.SinglePlayer()
+local fx, sp
+
+sp = game.SinglePlayer()
 
 local shellNetCV
-local culldistancecvar = GetConVar("sv_tfa_worldmodel_culldistance")
-local muzzleCV = GetConVar("sv_tfa_net_muzzles")
 
 function SWEP:EventShell()
+	--[[if SERVER and not game.SinglePlayer() then
+		net.Start("tfaBaseShellSV")
+		net.WriteEntity(self)
+		net.SendOmit(self:GetOwner())
+	else]]--
 	self:MakeShellBridge(IsFirstTimePredicted())
+	--end
 end
 
 function SWEP:PCFTracer(bul, hitpos, ovrride)
-	if not bul or not bul.PCFTracer then return end
+	if bul.PCFTracer then
+		self:UpdateMuzzleAttachment()
+		local mzp = self:GetMuzzlePos()
+		if bul.PenetrationCount > 0 and not ovrride then return end --Taken care of with the pen effect
 
-	self:UpdateMuzzleAttachment()
-	local mzp = self:GetMuzzlePos()
-	if bul.PenetrationCount and bul.PenetrationCount > 0 and not ovrride then return end
+		if (CLIENT or game.SinglePlayer()) and self.Scoped and self:IsCurrentlyScoped() and self:IsFirstPerson() then
+			TFA.ParticleTracer(bul.PCFTracer, self:GetOwner():GetShootPos() - self:GetOwner():EyeAngles():Up() * 5, hitpos, false, 0, -1)
+		else
+			local vent = self
 
-	if (CLIENT or sp) and self.Scoped and self.IsCurrentlyScoped and self:IsCurrentlyScoped() and self.IsFirstPerson and self:IsFirstPerson() then
-		TFA.ParticleTracer(bul.PCFTracer, self:GetOwner():GetShootPos() - self:GetOwner():EyeAngles():Up() * 5, hitpos, false, 0, -1)
-		return
-	end
+			if (CLIENT or game.SinglePlayer()) and self:IsFirstPerson() then
+				vent = self.OwnerViewModel
+			end
 
-	local vent = self
-	if (CLIENT or sp) and self.IsFirstPerson and self:IsFirstPerson() then
-		vent = self.OwnerViewModel
-	end
-
-	if sp and self.IsFirstPerson and not self:IsFirstPerson() then
-		TFA.ParticleTracer(bul.PCFTracer, self:GetOwner():GetShootPos() + self:GetOwner():GetAimVector() * 32, hitpos, false)
-	else
-		if not mzp or not mzp.Pos then return end
-		TFA.ParticleTracer(bul.PCFTracer, mzp.Pos, hitpos, false, vent, self.MuzzleAttachmentRaw or 1)
+			if game.SinglePlayer() and not self:IsFirstPerson() then
+				TFA.ParticleTracer(bul.PCFTracer, self:GetOwner():GetShootPos() + self:GetOwner():GetAimVector() * 32, hitpos, false)
+			else
+				TFA.ParticleTracer(bul.PCFTracer, mzp.Pos, hitpos, false, vent, self.MuzzleAttachmentRaw or 1)
+			end
+		end
 	end
 end
 
 function SWEP:MakeShellBridge(ifp)
-	if sp and CLIENT then return end
-
+	if game.SinglePlayer() and CLIENT then return end
 	shellNetCV = shellNetCV or GetConVar("sv_tfa_net_shells")
-	if SERVER and (not sp) and shellNetCV and not shellNetCV:GetBool() then return end
+	if SERVER and ( not game.SinglePlayer() ) and not shellNetCV:GetBool() then return end
 
 	if ifp then
-		if (self.LuaShellEjectDelay or 0) > 0 then
-			local spd = self.NZAnimationSpeed and self:NZAnimationSpeed(ACT_VM_PRIMARYATTACK) or 1
-			if spd <= 0 then spd = 1 end
-			self.LuaShellRequestTime = CurTime() + self.LuaShellEjectDelay / spd
+		if self.LuaShellEjectDelay > 0 then
+			self.LuaShellRequestTime = CurTime() + self.LuaShellEjectDelay / self:NZAnimationSpeed(ACT_VM_PRIMARYATTACK)
 		else
 			self:MakeShell()
 		end
@@ -54,46 +55,49 @@ end
 SWEP.ShellEffectOverride = nil
 
 function SWEP:MakeShell()
-	if not IsValid(self) then return end
+	local shelltype = "tfa_shell"
+	if IsValid(self) then
+		self:EjectionSmoke(true)
+		local vm = (self:IsFirstPerson()) and self.OwnerViewModel or self
+		if type(shelltype) ~= "string" or shelltype == "" then return end -- allows to disable shells by setting override to ""
 
-	self:EjectionSmoke(true)
+		if IsValid(vm) then
+			fx = EffectData()
+			local attid = vm:LookupAttachment(self:GetStat("ShellAttachment"))
 
-	local shelltype = self.ShellEffectOverride or "tfa_shell"
-	if type(shelltype) ~= "string" then return end
-	if shelltype == "" then return end
+			if self.Akimbo then
+				attid = 3 + self.AnimCycle
+			end
 
-	local vm = (self.IsFirstPerson and self:IsFirstPerson()) and self.OwnerViewModel or self
-	if not IsValid(vm) then return end
+			attid = math.Clamp(attid and attid or 2, 1, 127)
+			local angpos = vm:GetAttachment(attid)
 
-	local attName = self.GetStat and self:GetStat("ShellAttachment") or self.ShellAttachment
-	local attid
-
-	if isnumber(attName) then
-		attid = attName
-	else
-		attid = vm:LookupAttachment(attName or "")
+			if angpos then
+				fx:SetEntity(self)
+				fx:SetAttachment(attid)
+				fx:SetMagnitude(1)
+				fx:SetScale(1)
+				fx:SetOrigin(angpos.Pos)
+				fx:SetNormal(angpos.Ang:Forward())
+				if SERVER then
+					local crep = RecipientFilter()
+					crep:AddPVS(self:GetPos())
+					util.Effect(shelltype, fx)
+				else
+					util.Effect(shelltype, fx)
+				end
+			end
+		end
 	end
-
-	if self.Akimbo then
-		attid = 3 + (self.AnimCycle or 0)
-	end
-
-	attid = math.Clamp(attid or 2, 1, 127)
-
-	local angpos = vm:GetAttachment(attid)
-	if not angpos then return end
-
-	fx = EffectData()
-	fx:SetEntity(self)
-	fx:SetAttachment(attid)
-	fx:SetMagnitude(1)
-	fx:SetScale(1)
-	fx:SetOrigin(angpos.Pos)
-	fx:SetNormal(angpos.Ang:Forward())
-
-	util.Effect(shelltype, fx)
 end
 
+--[[
+Function Name:  CleanParticles
+Syntax: self:CleanParticles().
+Returns:  Nothing.
+Notes:    Cleans up particles.
+Purpose:  FX
+]]--
 function SWEP:CleanParticles()
 	if not IsValid(self) then return end
 
@@ -106,82 +110,96 @@ function SWEP:CleanParticles()
 	end
 
 	if not self:OwnerIsValid() then return end
-
 	local vm = self.OwnerViewModel
+
 	if IsValid(vm) then
 		if vm.StopParticles then
 			vm:StopParticles()
 		end
+
 		if vm.StopParticleEmission then
 			vm:StopParticleEmission()
 		end
 	end
 end
 
+--[[
+Function Name:  EjectionSmoke
+Syntax: self:EjectionSmoke().
+Returns:  Nothing.
+Notes:    Puff of smoke on shell attachment.
+Purpose:  FX
+]]--
 function SWEP:EjectionSmoke()
-	if not TFA.GetEJSmokeEnabled() then return end
+	if TFA.GetEJSmokeEnabled() then
+		local vm = self.OwnerViewModel
 
-	local vm = self.OwnerViewModel
-	if not IsValid(vm) then return end
+		if IsValid(vm) then
+			local att = vm:LookupAttachment(self.ShellAttachment)
 
-	local attName = self.ShellAttachment
-	local att
+			if not att or att <= 0 then
+				att = 2
+			end
 
-	if isnumber(attName) then
-		att = attName
-	else
-		att = vm:LookupAttachment(attName or "")
-	end
+			local oldatt = att
 
-	if not att or att <= 0 then
-		att = 2
-	end
+			if self.ShellAttachmentRaw then
+				att = self.ShellAttachmentRaw
+			end
 
-	local oldatt = att
+			local angpos = vm:GetAttachment(att)
 
-	if self.ShellAttachmentRaw then
-		att = self.ShellAttachmentRaw
-	end
+			if not angpos then
+				att = oldatt
+				angpos = vm:GetAttachment(att)
+			end
 
-	local angpos = vm:GetAttachment(att)
-	if not angpos then
-		att = oldatt
-		angpos = vm:GetAttachment(att)
-	end
-	if not angpos or not angpos.Pos then return end
-
-	fx = EffectData()
-	fx:SetEntity(vm)
-	fx:SetOrigin(angpos.Pos)
-	fx:SetAttachment(att)
-	fx:SetNormal(angpos.Ang:Forward())
-
-	util.Effect("tfa_shelleject_smoke", fx)
-end
-
-function SWEP:ShootEffectsCustom(ifp)
-	if CLIENT and self:OwnerIsValid() and culldistancecvar and culldistancecvar:GetInt() ~= -1 then
-		if self:GetOwner():GetPos():Distance(LocalPlayer():EyePos()) > culldistancecvar:GetFloat() then
-			return
+			if angpos and angpos.Pos then
+				fx = EffectData()
+				fx:SetEntity(vm)
+				fx:SetOrigin(angpos.Pos)
+				fx:SetAttachment(att)
+				fx:SetNormal(angpos.Ang:Forward())
+				if SERVER then
+					local crep = RecipientFilter()
+					crep:AddPVS(self:GetPos())
+					util.Effect("tfa_shelleject_smoke", fx)
+				else
+					util.Effect("tfa_shelleject_smoke", fx)
+				end
+			end
 		end
 	end
+end
 
-	if SERVER and (not sp) and muzzleCV and not muzzleCV:GetBool() then return end
-
+--[[
+Function Name:  ShootEffectsCustom
+Syntax: self:ShootEffectsCustom().
+Returns:  Nothing.
+Notes:    Calls the proper muzzleflash, muzzle smoke, muzzle light code.
+Purpose:  FX
+]]--
+local culldistancecvar = GetConVar("sv_tfa_worldmodel_culldistance")
+local muzzleCV = GetConVar("sv_tfa_net_muzzles")
+function SWEP:ShootEffectsCustom( ifp )
+	if CLIENT and self:OwnerIsValid() and culldistancecvar and self:GetOwner():GetPos():Distance(LocalPlayer():EyePos()) > culldistancecvar:GetFloat() and culldistancecvar:GetInt() ~= -1 then return end
+	if SERVER and ( not sp ) and not muzzleCV:GetBool() then return end
 	if self.DoMuzzleFlash ~= nil then
 		self.MuzzleFlashEnabled = self.DoMuzzleFlash
 		self.DoMuzzleFlash = nil
 	end
-
 	if not self.MuzzleFlashEnabled then return end
-
 	ifp = ifp or IsFirstTimePredicted()
+
+	if sp == nil then
+		sp = game.SinglePlayer()
+	end
 
 	if (SERVER and sp and self.ParticleMuzzleFlash) or (SERVER and not sp) then
 		net.Start("tfa_base_muzzle_mp")
 		net.WriteEntity(self)
 
-		if sp then
+		if (sp) then
 			net.Broadcast()
 		else
 			local crep = RecipientFilter()
@@ -194,40 +212,57 @@ function SWEP:ShootEffectsCustom(ifp)
 	end
 
 	if (CLIENT and ifp and not sp) or (sp and SERVER) then
-		local owner = self:GetOwner()
-		if not IsValid(owner) then return end
-
-		local vm = owner:GetViewModel()
+		local vm = self.Owner:GetViewModel()
 		self:UpdateMuzzleAttachment()
-
-		local entForLookup = (sp and vm) or self
-		local att = math.max(1, self.MuzzleAttachmentRaw or (IsValid(entForLookup) and entForLookup:LookupAttachment(self.MuzzleAttachment) or 1))
-
+		local att = math.max(1, self.MuzzleAttachmentRaw or (sp and vm or self):LookupAttachment(self.MuzzleAttachment))
 		if self.Akimbo then
-			att = 1 + (self.AnimCycle or 0)
+			att = 1 + self.AnimCycle
 		end
-
 		self:CleanParticles()
-
 		fx = EffectData()
-		fx:SetOrigin(owner:GetShootPos())
-		fx:SetNormal(owner:EyeAngles():Forward())
+		fx:SetOrigin(self.Owner:GetShootPos())
+		fx:SetNormal(self.Owner:EyeAngles():Forward())
 		fx:SetEntity(self)
 		fx:SetAttachment(att)
-
 		util.Effect("tfa_muzzlesmoke", fx)
 
 		local fxn = self:GetSilenced() and "tfa_muzzleflash_silenced" or self.MuzzleFlashEffect
-		util.Effect(fxn, fx)
+		if SERVER then
+			local crep = RecipientFilter()
+			crep:AddPVS(self:GetOwner():GetShootPos())
+			util.Effect(fxn, fx)
+		else
+			util.Effect(fxn, fx)
+		end
 	end
 end
 
-function SWEP:CanDustEffect(matv)
-	local n = self:GetMaterialConcise(matv)
-	return n == "energy" or n == "dirt" or n == "ceramic" or n == "plastic" or n == "wood"
+--[[
+Function Name:  CanDustEffect
+Syntax: self:CanDustEffect( concise material name ).
+Returns:  True/False
+Notes:    Used for the impact effect.  Should be used with GetMaterialConcise.
+Purpose:  Utility
+]]--
+
+function SWEP:CanDustEffect( matv )
+	local n = self:GetMaterialConcise(matv )
+	if n == "energy" or n == "dirt" or n == "ceramic" or n == "plastic" or n == "wood" then return true end
+
+	return false
 end
+
+--[[
+Function Name:  CanSparkEffect
+Syntax: self:CanSparkEffect( concise material name ).
+Returns:  True/False
+Notes:    Used for the impact effect.  Should be used with GetMaterialConcise.
+Purpose:  Utility
+]]--
 
 function SWEP:CanSparkEffect(matv)
 	local n = self:GetMaterialConcise(matv)
-	return n == "default" or n == "metal"
+	if n == "default" or n == "metal" then return true end
+
+	return false
 end

@@ -1,24 +1,5 @@
-if SERVER then AddCSLuaFile() end
-
 SWEP.Base = "tfa_gun_base"
 DEFINE_BASECLASS(SWEP.Base)
-
-local GetConVar = GetConVar
-local IsValid = IsValid
-local FrameTime = FrameTime
-
-local math_Clamp = math.Clamp
-local math_sqrt = math.sqrt
-local math_Approach = math.Approach
-
-local timer_Simple = timer.Simple
-local pairs = pairs
-
-SWEP.Secondary = SWEP.Secondary or {}
-SWEP.ScopeAngleTransforms = SWEP.ScopeAngleTransforms or {}
-SWEP.ScopeOverlayTransforms = SWEP.ScopeOverlayTransforms or { 0, 0 }
-SWEP.ScopeReticule_Scale = SWEP.ScopeReticule_Scale or { 1, 1 }
-
 SWEP.Secondary.ScopeZoom = 1
 SWEP.Secondary.UseACOG = false
 SWEP.Secondary.UseMilDot = false
@@ -26,10 +7,14 @@ SWEP.Secondary.UseSVD = false
 SWEP.Secondary.UseParabolic = false
 SWEP.Secondary.UseElcan = false
 SWEP.Secondary.UseGreenDuplex = false
-
 SWEP.RTScopeFOV = 6
 SWEP.Scoped = false
 SWEP.BoltAction = false
+SWEP.ScopeAngleTransforms = {}
+--{"P",1} --Pitch, 1
+--{"Y",1} --Yaw, 1
+--{"R",1} --Roll, 1
+SWEP.ScopeOverlayTransforms = {0, 0}
 SWEP.ScopeOverlayTransformMultiplier = 0.8
 SWEP.RTMaterialOverride = 1
 SWEP.IronSightsSensitivity = 1
@@ -37,340 +22,286 @@ SWEP.ScopeShadow = nil
 SWEP.ScopeReticule = nil
 SWEP.ScopeDirt = nil
 SWEP.ScopeReticule_CrossCol = false
+SWEP.ScopeReticule_Scale = {1, 1}
+--[[End of Tweakable Parameters]]--
 SWEP.Scoped_3D = true
 SWEP.BoltAction_3D = false
-SWEP.RTOpaque = true
 
-local cv_3dscope = GetConVar("cl_tfa_3dscope")
-local cv_3dscope_overlay = GetConVar("cl_tfa_3dscope_overlay")
-local cv_fov = GetConVar("fov_desired")
+local scopecvar = GetConVar("cl_tfa_3dscope")
+local scopeshadowcvar = GetConVar("cl_tfa_3dscope_overlay")
 
 function SWEP:Do3DScope()
-    if cv_3dscope then
-        return cv_3dscope:GetBool()
-    end
-
-    if self:OwnerIsValid() and self.Owner and self.Owner.GetInfoNum then
-        return self.Owner:GetInfoNum("cl_tfa_3dscope", 1) == 1
-    end
-
-    return true
+	if scopecvar then
+		return scopecvar:GetBool()
+	else
+		if self:OwnerIsValid() and self.Owner.GetInfoNum then
+			return self.Owner:GetInfoNum("cl_tfa_3dscope", 1) == 1
+		else
+			return true
+		end
+	end
 end
 
 function SWEP:Do3DScopeOverlay()
-    if cv_3dscope_overlay then
-        return cv_3dscope_overlay:GetBool()
-    end
-
-    return false
+	if scopeshadowcvar then
+		return scopeshadowcvar:GetBool()
+	else
+		return false
+	end
 end
+
+local cv_fov = GetConVar("fov_desired")
 
 function SWEP:UpdateScopeType()
-    if self:Do3DScope() then
-        self.Scoped = false
-        self.Scoped_3D = true
+	if self:Do3DScope() then
+		self.Scoped = false
+		self.Scoped_3D = true
 
-        local sec = self.Secondary or {}
-        self.Secondary = sec
+		if not self.Secondary.ScopeZoom_Backup then
+			self.Secondary.ScopeZoom_Backup = self.Secondary.ScopeZoom
+		end
 
-        if sec.ScopeZoom_Backup == nil then
-            sec.ScopeZoom_Backup = sec.ScopeZoom
-        end
+		if self.BoltAction then
+			self.BoltAction_3D = true
+			self.BoltAction = self.BoltAction_Forced or false
+			self.DisableChambering = true
+			self.FireModeName = "BOLT-ACTION"
+		end
 
-        if self.BoltAction then
-            self.BoltAction_3D = true
-            self.BoltAction = self.BoltAction_Forced or false
-            self.DisableChambering = true
-            self.FireModeName = "BOLT-ACTION"
-        end
+		if self.Secondary.ScopeZoom and self.Secondary.ScopeZoom > 0 then
+			self.RTScopeFOV = 90 / self.Secondary.ScopeZoom
+			self.IronSightsSensitivity = math.sqrt(1 / self.Secondary.ScopeZoom)
+			self.Secondary.ScopeZoom = nil
+			self.Secondary.IronFOV_Backup = self.Secondary.IronFOV
+			self.Secondary.IronFOV = 70
+		end
+	else
+		self.Scoped = true
+		self.Scoped_3D = false
 
-        if sec.ScopeZoom and sec.ScopeZoom > 0 then
-            self.RTScopeFOV = 90 / sec.ScopeZoom
-            self.IronSightsSensitivity = math_sqrt(1 / sec.ScopeZoom)
-            sec.ScopeZoom = nil
-            sec.IronFOV_Backup = sec.IronFOV
-            sec.IronFOV = 70
-        end
-    else
-        self.Scoped = true
-        self.Scoped_3D = false
+		if self.Secondary.ScopeZoom_Backup then
+			self.Secondary.ScopeZoom = self.Secondary.ScopeZoom_Backup
+		else
+			self.Secondary.ScopeZoom = 4
+		end
 
-        local sec = self.Secondary or {}
-        self.Secondary = sec
+		if self.BoltAction_3D then
+			self.BoltAction = true
+			self.BoltAction_3D = nil
+		end
 
-        if sec.ScopeZoom_Backup then
-            sec.ScopeZoom = sec.ScopeZoom_Backup
-        else
-            sec.ScopeZoom = 4
-        end
+		self.Secondary.IronFOV = 90 / self.Secondary.ScopeZoom
+		self.IronSightsSensitivity = 1
+	end
 
-        if self.BoltAction_3D then
-            self.BoltAction = true
-            self.BoltAction_3D = nil
-        end
-
-        sec.IronFOV = 90 / sec.ScopeZoom
-        self.IronSightsSensitivity = 1
-    end
-
-    if cv_fov then
-        self.DefaultFOV = cv_fov:GetFloat()
-    elseif self.Owner and self:OwnerIsValid() then
-        self.DefaultFOV = self.Owner.GetInfoNum and self.Owner:GetInfoNum("fov_desired", 90) or 90
-    end
-end
-
-local function scheduleScopeUpdate(self)
-    timer_Simple(0, function()
-        if not IsValid(self) or not self.OwnerIsValid or not self:OwnerIsValid() then
-            return
-        end
-
-        self:UpdateScopeType()
-
-        if SERVER then
-            self:CallOnClient("UpdateScopeType", "")
-        end
-    end)
+	if cv_fov then
+		self.DefaultFOV = cv_fov:GetFloat()
+	elseif self.Owner and self:OwnerIsValid() then
+		self.DefaultFOV = self.Owner.GetInfoNum and self.Owner:GetInfoNum("fov_desired", 90) or 90
+	end
 end
 
 function SWEP:Initialize()
-    self:UpdateScopeType()
-    scheduleScopeUpdate(self)
-    BaseClass.Initialize(self)
+	self:UpdateScopeType()
+
+	timer.Simple(0, function()
+		if IsValid(self) and self:OwnerIsValid() then
+			self:UpdateScopeType()
+
+			if SERVER then
+				self:CallOnClient("UpdateScopeType", "")
+			end
+		end
+	end)
+
+	BaseClass.Initialize(self)
+
 end
 
 function SWEP:Deploy(...)
-    if SERVER and self:OwnerIsValid() then
-        self:CallOnClient("UpdateScopeType", "")
-    end
+	if SERVER and self:OwnerIsValid() then
+		self:CallOnClient("UpdateScopeType", "")
+	end
 
-    self:UpdateScopeType()
-    scheduleScopeUpdate(self)
+	self:UpdateScopeType()
 
-    return BaseClass.Deploy(self, ...)
+	timer.Simple(0, function()
+		if IsValid(self) and self:OwnerIsValid() then
+			self:UpdateScopeType()
+
+			if SERVER then
+				self:CallOnClient("UpdateScopeType", "")
+			end
+		end
+	end)
+
+	return BaseClass.Deploy(self,...)
 end
+
+local flipcv
+local cd = {}
+local crosscol = Color(255, 255, 255, 255)
+SWEP.RTOpaque = true
+
+local cv_cc_r = GetConVar("cl_tfa_hud_crosshair_color_r")
+local cv_cc_g = GetConVar("cl_tfa_hud_crosshair_color_g")
+local cv_cc_b = GetConVar("cl_tfa_hud_crosshair_color_b")
+local cv_cc_a = GetConVar("cl_tfa_hud_crosshair_color_a")
+
 
 SWEP.defaultscrvec = Vector()
 
-if CLIENT then
-    local surface = surface
-    local render = render
-    local cam = cam
-    local draw = draw
 
-    local Color = Color
-    local Material = Material
+SWEP.RTCode = function(self, rt, scrw, scrh)
+	if not self:VMIV() then return end
+	if not self.myshadowmask then
+		self.myshadowmask = surface.GetTextureID(self.ScopeShadow or "vgui/scope_shadowmask_test")
+	end
 
-    local surface_GetTextureID = surface.GetTextureID
-    local surface_SetDrawColor = surface.SetDrawColor
-    local surface_SetMaterial = surface.SetMaterial
-    local surface_SetTexture = surface.SetTexture
-    local surface_DrawRect = surface.DrawRect
-    local surface_DrawTexturedRect = surface.DrawTexturedRect
-    local surface_DrawTexturedRectUV = surface.DrawTexturedRectUV
-    local draw_NoTexture = draw.NoTexture
+	if not self.myreticule then
+		self.myreticule = Material(self.ScopeReticule or "scope/gdcw_scopesightonly")
+	end
 
-    local render_Clear = render.Clear
-    local render_SetScissorRect = render.SetScissorRect
-    local render_RenderView = render.RenderView
-    local render_OverrideAlphaWriteEnable = render.OverrideAlphaWriteEnable
+	if not self.mydirt then
+		self.mydirt = Material(self.ScopeDirt or "vgui/scope_dirt")
+	end
 
-    local cam_Start2D = cam.Start2D
-    local cam_End2D = cam.End2D
+	if not flipcv then
+		flipcv = GetConVar("cl_tfa_viewmodel_flip")
+	end
 
-    local cv_flip = GetConVar("cl_tfa_viewmodel_flip")
+	local vm = self.OwnerViewModel
 
-    local cv_cc_r = GetConVar("cl_tfa_hud_crosshair_color_r")
-    local cv_cc_g = GetConVar("cl_tfa_hud_crosshair_color_g")
-    local cv_cc_b = GetConVar("cl_tfa_hud_crosshair_color_b")
-    local cv_cc_a = GetConVar("cl_tfa_hud_crosshair_color_a")
+	if not self.LastOwnerPos then
+		self.LastOwnerPos = self.Owner:GetShootPos()
+	end
 
-    local cd = {}
-    local crosscol = Color(255, 255, 255, 255)
+	local owoff = self.Owner:GetShootPos() - self.LastOwnerPos
+	self.LastOwnerPos = self.Owner:GetShootPos()
+	local scrpos
+	if self.RTScopeAttachment and self.RTScopeAttachment > 0 then
+		local att = vm:GetAttachment( self.RTScopeAttachment or 1 )
+		if not att then return end
+		local pos = att.Pos - owoff
+		scrpos = pos:ToScreen()
+	else
+		self.defaultscrvec.x = scrw / 2
+		self.defaultscrvec.y = scrh / 2
+		scrpos = self.defaultscrvec
+	end
 
-    SWEP.RTCode = function(self, rt, scrw, scrh)
-        if not self:VMIV() then
-            return
-        end
+	scrpos.x = scrpos.x - scrw / 2 + self.ScopeOverlayTransforms[1]
+	scrpos.y = scrpos.y - scrh / 2 + self.ScopeOverlayTransforms[2]
+	scrpos.x = scrpos.x / scrw * 1920
+	scrpos.y = scrpos.y / scrw * 1920
+	scrpos.x = math.Clamp(scrpos.x, -1024, 1024)
+	scrpos.y = math.Clamp(scrpos.y, -1024, 1024)
+	--scrpos.x = scrpos.x * ( 2 - self.IronSightsProgress*1 )
+	--scrpos.y = scrpos.y * ( 2 - self.IronSightsProgress*1 )
+	scrpos.x = scrpos.x * self.ScopeOverlayTransformMultiplier
+	scrpos.y = scrpos.y * self.ScopeOverlayTransformMultiplier
 
-        local owner = self:GetOwner()
-        if not IsValid(owner) then
-            return
-        end
+	if not self.scrpos then
+		self.scrpos = scrpos
+	end
 
-        local vm = self.OwnerViewModel
-        if not IsValid(vm) then
-            vm = owner:GetViewModel()
-            self.OwnerViewModel = vm
-        end
+	self.scrpos.x = math.Approach(self.scrpos.x, scrpos.x, (scrpos.x - self.scrpos.x) * FrameTime() * 10)
+	self.scrpos.y = math.Approach(self.scrpos.y, scrpos.y, (scrpos.y - self.scrpos.y) * FrameTime() * 10)
+	scrpos = self.scrpos
+	render.OverrideAlphaWriteEnable(true, true)
+	surface.SetDrawColor(color_white)
+	surface.DrawRect(-512, -512, 1024, 1024)
+	render.OverrideAlphaWriteEnable(true, true)
 
-        if not IsValid(vm) then
-            return
-        end
+	local ang = self:GetOwner():EyeAngles()
+	if self.RTScopeAttachment and self.RTScopeAttachment > 0 then
+		local AngPos = vm:GetAttachment( self.RTScopeAttachment )
 
-        if not self.myshadowmask then
-            self.myshadowmask = surface_GetTextureID(self.ScopeShadow or "vgui/scope_shadowmask_test")
-        end
+		if AngPos then
+			ang = AngPos.Ang
 
-        if not self.myreticule then
-            self.myreticule = Material(self.ScopeReticule or "scope/gdcw_scopesightonly")
-        end
+			if flipcv:GetBool() then
+				ang.y = -ang.y
+			end
 
-        if not self.mydirt then
-            self.mydirt = Material(self.ScopeDirt or "vgui/scope_dirt")
-        end
+			for _, v in pairs(self.ScopeAngleTransforms) do
+				if v[1] == "P" then
+					ang:RotateAroundAxis(ang:Right(), v[2])
+				elseif v[1] == "Y" then
+					ang:RotateAroundAxis(ang:Up(), v[2])
+				elseif v[1] == "R" then
+					ang:RotateAroundAxis(ang:Forward(), v[2])
+				end
+			end
+		end
+	end
 
-        if not self.LastOwnerPos then
-            self.LastOwnerPos = owner:GetShootPos()
-        end
+	cd.angles = ang
+	cd.origin = self.Owner:GetShootPos()
 
-        local shootPos = owner:GetShootPos()
-        local owoff = shootPos - self.LastOwnerPos
-        self.LastOwnerPos = shootPos
+	if not self.RTScopeOffset then
+		self.RTScopeOffset = {0, 0}
+	end
 
-        local scrpos
-        local attId = self.RTScopeAttachment
+	if not self.RTScopeScale then
+		self.RTScopeScale = {1, 1}
+	end
 
-        if attId and attId > 0 then
-            local att = vm:GetAttachment(attId)
-            if not att then
-                return
-            end
+	local rtow, rtoh = self.RTScopeOffset[1], self.RTScopeOffset[2]
+	local rtw, rth = 512 * self.RTScopeScale[1], 512 * self.RTScopeScale[2]
+	cd.x = 0
+	cd.y = 0
+	cd.w = rtw
+	cd.h = rth
+	cd.fov = self.RTScopeFOV
+	cd.drawviewmodel = false
+	cd.drawhud = false
+	render.Clear(0, 0, 0, 255, true, true)
+	render.SetScissorRect(0 + rtow, 0 + rtoh, rtw + rtow, rth + rtoh, true)
 
-            local pos = att.Pos - owoff
-            scrpos = pos:ToScreen()
-        else
-            local v = self.defaultscrvec
-            v.x = scrw * 0.5
-            v.y = scrh * 0.5
-            scrpos = v
-        end
+	if self.IronSightsProgress > 0.01 and self.Scoped_3D then
+		render.RenderView(cd)
+	end
 
-        scrpos.x = scrpos.x - scrw * 0.5 + (self.ScopeOverlayTransforms[1] or 0)
-        scrpos.y = scrpos.y - scrh * 0.5 + (self.ScopeOverlayTransforms[2] or 0)
+	render.SetScissorRect(0, 0, rtw, rth, false)
+	render.OverrideAlphaWriteEnable(false, true)
+	cam.Start2D()
+	draw.NoTexture()
+	surface.SetTexture(self.myshadowmask)
+	surface.SetDrawColor(color_white)
 
-        scrpos.x = (scrpos.x / scrw) * 1920
-        scrpos.y = (scrpos.y / scrw) * 1920
+	if self:Do3DScopeOverlay() then
+		surface.DrawTexturedRect(scrpos.x + rtow - rtw / 2, scrpos.y + rtoh - rth / 2, rtw * 2, rth * 2)
+	end
 
-        scrpos.x = math_Clamp(scrpos.x, -1024, 1024) * (self.ScopeOverlayTransformMultiplier or 0.8)
-        scrpos.y = math_Clamp(scrpos.y, -1024, 1024) * (self.ScopeOverlayTransformMultiplier or 0.8)
+	if self.ScopeReticule_CrossCol then
+		crosscol.r = cv_cc_r:GetFloat()
+		crosscol.g = cv_cc_g:GetFloat()
+		crosscol.b = cv_cc_b:GetFloat()
+		crosscol.a = cv_cc_a:GetFloat()
+		surface.SetDrawColor(crosscol)
+	end
 
-        if not self.scrpos then
-            self.scrpos = { x = scrpos.x, y = scrpos.y }
-        end
+	surface.SetMaterial(self.myreticule)
+	local tmpborderw = rtw * (1 - self.ScopeReticule_Scale[1]) / 2
+	local tmpborderh = rth * (1 - self.ScopeReticule_Scale[2]) / 2
+	surface.DrawTexturedRect(rtow + tmpborderw, rtoh + tmpborderh, rtw - tmpborderw * 2, rth - tmpborderh * 2)
+	surface.SetDrawColor(color_black)
+	draw.NoTexture()
 
-        local s = self.scrpos
-        s.x = math_Approach(s.x, scrpos.x, (scrpos.x - s.x) * FrameTime() * 10)
-        s.y = math_Approach(s.y, scrpos.y, (scrpos.y - s.y) * FrameTime() * 10)
-        scrpos = s
+	if self:Do3DScopeOverlay() then
+		surface.DrawRect(scrpos.x - 2048 + rtow, -1024 + rtoh, 2048, 2048)
+		surface.DrawRect(scrpos.x + rtw + rtow, -1024 + rtoh, 2048, 2048)
+		surface.DrawRect(-1024 + rtow, scrpos.y - 2048 + rtoh, 2048, 2048)
+		surface.DrawRect(-1024 + rtow, scrpos.y + rth + rtoh, 2048, 2048)
+	end
 
-        render_OverrideAlphaWriteEnable(true, true)
-        surface_SetDrawColor(255, 255, 255, 255)
-        surface_DrawRect(-512, -512, 1024, 1024)
-
-        local ang = owner:EyeAngles()
-        if attId and attId > 0 then
-            local angPos = vm:GetAttachment(attId)
-            if angPos then
-                ang = angPos.Ang
-
-                if cv_flip and cv_flip:GetBool() then
-                    ang.y = -ang.y
-                end
-
-                for _, v in pairs(self.ScopeAngleTransforms or {}) do
-                    local axis = v and v[1]
-                    local deg = v and v[2]
-                    if axis == "P" then
-                        ang:RotateAroundAxis(ang:Right(), deg)
-                    elseif axis == "Y" then
-                        ang:RotateAroundAxis(ang:Up(), deg)
-                    elseif axis == "R" then
-                        ang:RotateAroundAxis(ang:Forward(), deg)
-                    end
-                end
-            end
-        end
-
-        cd.angles = ang
-        cd.origin = shootPos
-        cd.x = 0
-        cd.y = 0
-
-        local scopeOffset = self.RTScopeOffset or { 0, 0 }
-        local scopeScale = self.RTScopeScale or { 1, 1 }
-
-        local rtow, rtoh = scopeOffset[1] or 0, scopeOffset[2] or 0
-        local rtw, rth = 512 * (scopeScale[1] or 1), 512 * (scopeScale[2] or 1)
-
-        cd.w = rtw
-        cd.h = rth
-        cd.fov = self.RTScopeFOV or 10
-        cd.drawviewmodel = false
-        cd.drawhud = false
-
-        render_Clear(0, 0, 0, 255, true, true)
-        render_SetScissorRect(rtow, rtoh, rtw + rtow, rth + rtoh, true)
-
-        if (self.IronSightsProgress or 0) > 0.01 and self.Scoped_3D then
-            render_RenderView(cd)
-        end
-
-        render_SetScissorRect(0, 0, rtw, rth, false)
-        render_OverrideAlphaWriteEnable(false, true)
-
-        cam_Start2D()
-        draw_NoTexture()
-
-        surface_SetTexture(self.myshadowmask)
-        surface_SetDrawColor(255, 255, 255, 255)
-
-        if self:Do3DScopeOverlay() then
-            surface_DrawTexturedRect(scrpos.x + rtow - rtw * 0.5, scrpos.y + rtoh - rth * 0.5, rtw * 2, rth * 2)
-        end
-
-        if self.ScopeReticule_CrossCol and cv_cc_r and cv_cc_g and cv_cc_b and cv_cc_a then
-            crosscol.r = cv_cc_r:GetFloat()
-            crosscol.g = cv_cc_g:GetFloat()
-            crosscol.b = cv_cc_b:GetFloat()
-            crosscol.a = cv_cc_a:GetFloat()
-            surface_SetDrawColor(crosscol)
-        else
-            surface_SetDrawColor(255, 255, 255, 255)
-        end
-
-        surface_SetMaterial(self.myreticule)
-
-        local retScale = self.ScopeReticule_Scale or { 1, 1 }
-        local tmpborderw = rtw * (1 - (retScale[1] or 1)) * 0.5
-        local tmpborderh = rth * (1 - (retScale[2] or 1)) * 0.5
-
-        surface_DrawTexturedRect(rtow + tmpborderw, rtoh + tmpborderh, rtw - tmpborderw * 2, rth - tmpborderh * 2)
-
-        surface_SetDrawColor(0, 0, 0, 255)
-        draw_NoTexture()
-
-        if self:Do3DScopeOverlay() then
-            surface_DrawRect(scrpos.x - 2048 + rtow, -1024 + rtoh, 2048, 2048)
-            surface_DrawRect(scrpos.x + rtw + rtow, -1024 + rtoh, 2048, 2048)
-            surface_DrawRect(-1024 + rtow, scrpos.y - 2048 + rtoh, 2048, 2048)
-            surface_DrawRect(-1024 + rtow, scrpos.y + rth + rtoh, 2048, 2048)
-        end
-
-        local isp = self.IronSightsProgress or 0
-        local fade = math_Clamp((math_Clamp(isp - 0.75, 0, 0.25) * 4), 0, 1)
-        local blackAlpha = math_Clamp(255 - 255 * fade, 0, 255)
-        surface_SetDrawColor(0, 0, 0, blackAlpha)
-        surface_DrawRect(-1024 + rtow, -1024 + rtoh, 2048, 2048)
-
-        surface_SetMaterial(self.mydirt)
-        surface_SetDrawColor(255, 255, 255, 128)
-        surface_DrawTexturedRect(0, 0, rtw, rth)
-
-        surface_SetDrawColor(255, 255, 255, 64)
-        surface_DrawTexturedRectUV(rtow, rtoh, rtw, rth, 2, 0, 0, 2)
-
-        cam_End2D()
-    end
+	surface.SetDrawColor(ColorAlpha(color_black, 255 - 255 * (math.Clamp(self.IronSightsProgress - 0.75, 0, 0.25) * 4)))
+	surface.DrawRect(-1024 + rtow, -1024 + rtoh, 2048, 2048)
+	surface.SetMaterial(self.mydirt)
+	surface.SetDrawColor(ColorAlpha(color_white, 128))
+	surface.DrawTexturedRect(0, 0, rtw, rth)
+	surface.SetDrawColor(ColorAlpha(color_white, 64))
+	surface.DrawTexturedRectUV(rtow, rtoh, rtw, rth, 2, 0, 0, 2)
+	cam.End2D()
 end

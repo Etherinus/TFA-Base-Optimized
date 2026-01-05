@@ -1,37 +1,15 @@
-local Vector = Vector
-local angle_zero = angle_zero
-local vector_origin = vector_origin
-local istable = istable
-local isnumber = isnumber
-local isfunction = isfunction
-local ipairs = ipairs
-local pairs = pairs
-local CurTime = CurTime
-local print = print
-local math_abs = math.abs
-
-local onevec = Vector and Vector(1, 1, 1) or nil
+local onevec = Vector(1, 1, 1)
 
 local function RBP(vm)
-    if not (vm and vm.GetBoneCount and vm.ManipulateBoneScale and vm.ManipulateBoneAngles and vm.ManipulateBonePosition) then
-        return
-    end
-
     local bc = vm:GetBoneCount()
     if not bc or bc <= 0 then
         return
     end
 
     for i = 0, bc - 1 do
-        if onevec then
-            vm:ManipulateBoneScale(i, onevec)
-        end
-        if angle_zero then
-            vm:ManipulateBoneAngles(i, angle_zero)
-        end
-        if vector_origin then
-            vm:ManipulateBonePosition(i, vector_origin)
-        end
+        vm:ManipulateBoneScale(i, onevec)
+        vm:ManipulateBoneAngles(i, angle_zero)
+        vm:ManipulateBonePosition(i, vector_origin)
     end
 end
 
@@ -43,27 +21,12 @@ if CLIENT then
     local GetViewEntity = GetViewEntity
     local LocalPlayer = LocalPlayer
     local IsValid = IsValid
-    local hook_Add = hook and hook.Add
-    local render_PushRenderTarget = render and render.PushRenderTarget
-    local render_Clear = render and render.Clear
-    local render_PopRenderTarget = render and render.PopRenderTarget
-    local render_RenderView = render and render.RenderView
-
-    if not (CreateMaterial and GetRenderTarget and hook_Add and render_PushRenderTarget and render_Clear and render_PopRenderTarget and render_RenderView) then
-        return
-    end
-
-    local function ClearSubMaterials(ent)
-        if not (IsValid(ent) and ent.SetSubMaterial and ent.GetMaterials) then
-            return
-        end
-
-        local mats = ent:GetMaterials()
-        local count = mats and #mats or 0
-        for i = 0, count - 1 do
-            ent:SetSubMaterial(i, nil)
-        end
-    end
+    local pairs = pairs
+    local hook_Add = hook.Add
+    local render_PushRenderTarget = render.PushRenderTarget
+    local render_Clear = render.Clear
+    local render_PopRenderTarget = render.PopRenderTarget
+    local render_RenderView = render.RenderView
 
     local props = {
         ["$translucent"] = 1
@@ -93,45 +56,47 @@ if CLIENT then
         return false
     end
 
-    local function weaponNeedsRT(wepobj)
-        if wepobj._TFA_RTNeedsDraw ~= nil then
-            return wepobj._TFA_RTNeedsDraw
+    local function weaponNeedsRT(wep)
+        if wep._TFA_RTNeedsDraw ~= nil then
+            return wep._TFA_RTNeedsDraw
         end
 
-        local needs = wepobj.RTMaterialOverride ~= nil and wepobj.RTMaterialOverride ~= false
-        if not needs and wepobj.Scoped_3D then
+        local needs = wep.RTMaterialOverride ~= nil and wep.RTMaterialOverride ~= false
+        if not needs and wep.Scoped_3D then
             needs = true
         end
 
         if not needs then
-            needs = hasRTMaterial(wepobj.VElements) or hasRTMaterial(wepobj.WElements)
+            needs = hasRTMaterial(wep.VElements) or hasRTMaterial(wep.WElements)
         end
 
-        wepobj._TFA_RTNeedsDraw = needs
+        wep._TFA_RTNeedsDraw = needs
+
         return needs
     end
 
-    local function ensureScopeFOV(wepobj)
-        local zoom = wepobj.Secondary and wepobj.Secondary.ScopeZoom
+    local function ensureScopeFOV(wep)
+        local zoom = wep.Secondary and wep.Secondary.ScopeZoom
 
         if zoom and zoom > 0 then
             local target = 90 / zoom
-            if not wepobj.RTScopeFOV or math_abs(wepobj.RTScopeFOV - target) > 0.001 then
-                wepobj.RTScopeFOV = target
+
+            if not wep.RTScopeFOV or math.abs(wep.RTScopeFOV - target) > 0.001 then
+                wep.RTScopeFOV = target
             end
-        elseif not wepobj.RTScopeFOV or wepobj.RTScopeFOV <= 0 then
-            wepobj.RTScopeFOV = 10
+        elseif not wep.RTScopeFOV or wep.RTScopeFOV <= 0 then
+            wep.RTScopeFOV = 10
         end
 
-        return wepobj.RTScopeFOV
+        return wep.RTScopeFOV
     end
 
     local function fallbackRTCode(self, rtMat, scrw, scrh)
-        if self.OwnerIsValid and not self:OwnerIsValid() then
+        if not self:OwnerIsValid() then
             return
         end
 
-        local owner = self.GetOwner and self:GetOwner() or self.Owner
+        local owner = self:GetOwner()
         if not IsValid(owner) then
             return
         end
@@ -184,7 +149,7 @@ if CLIENT then
         TFA_RENDERSCREEN = true
 
         ply = GetViewEntity()
-        if not (IsValid(ply) and ply.IsPlayer and ply:IsPlayer()) then
+        if not IsValid(ply) or not ply:IsPlayer() then
             ply = LocalPlayer()
             TFA_RENDERSCREEN = false
             return
@@ -202,32 +167,28 @@ if CLIENT then
             return
         end
 
-        local vmModel = vm.GetModel and vm:GetModel() or ""
-        if oldVmModel ~= vmModel or wep ~= oldWep then
+        if oldVmModel ~= vm:GetModel() or wep ~= oldWep then
             if IsValid(oldWep) then
                 oldWep.MaterialCached = nil
             end
 
             oldWep = wep
             wep._TFA_RTNeedsDraw = nil
-
             RBP(vm)
+            vm:SetSubMaterial()
+            vm:SetSkin(0)
 
-            if vm.SetMaterial then
-                vm:SetMaterial("")
-            end
-            ClearSubMaterials(vm)
-
-            if vm.SetSkin then
-                vm:SetSkin(0)
-            end
-
-            oldVmModel = vmModel
+            oldVmModel = vm:GetModel()
             TFA_RENDERSCREEN = false
             return
         end
 
-        if wep.Skin and isnumber(wep.Skin) and vm.SetSkin and wep.SetSkin then
+        if not IsValid(wep) then
+            TFA_RENDERSCREEN = false
+            return
+        end
+
+        if wep.Skin and isnumber(wep.Skin) then
             vm:SetSkin(wep.Skin)
             wep:SetSkin(wep.Skin)
         end
@@ -235,25 +196,19 @@ if CLIENT then
         if wep.MaterialTable and not wep.MaterialCached then
             wep.MaterialCached = {}
 
-            if wep.SetMaterial and wep.GetMaterials then
-                local mats = wep:GetMaterials()
-                local mcount = mats and #mats or 0
-                if #wep.MaterialTable >= 1 and mcount <= 1 then
-                    wep:SetMaterial(wep.MaterialTable[1] or "")
-                else
-                    wep:SetMaterial("")
-                end
+            if #wep.MaterialTable >= 1 and #wep:GetMaterials() <= 1 then
+                wep:SetMaterial(wep.MaterialTable[1])
+            else
+                wep:SetMaterial("")
             end
 
-            ClearSubMaterials(wep)
-            ClearSubMaterials(vm)
+            wep:SetSubMaterial(nil, nil)
+            vm:SetSubMaterial(nil, nil)
 
-            if vm.SetSubMaterial then
-                for k, v in ipairs(wep.MaterialTable) do
-                    if not wep.MaterialCached[k] then
-                        wep.MaterialCached[k] = true
-                        vm:SetSubMaterial(k - 1, v)
-                    end
+            for k, v in ipairs(wep.MaterialTable) do
+                if not wep.MaterialCached[k] then
+                    wep.MaterialCached[k] = true
+                    vm:SetSubMaterial(k - 1, v)
                 end
             end
         end
@@ -264,6 +219,7 @@ if CLIENT then
         end
 
         local rtFunc = wep.RTCode
+
         if not rtFunc and wep.BaseClass and isfunction(wep.BaseClass.RTCode) then
             rtFunc = wep.BaseClass.RTCode
         end
@@ -272,7 +228,7 @@ if CLIENT then
         ensureScopeFOV(wep)
 
         TFARefreshRT()
-        oldVmModel = vmModel
+        oldVmModel = vm:GetModel()
 
         local scw = ScrW()
         local sch = ScrH()
@@ -282,15 +238,9 @@ if CLIENT then
         rtFunc(wep, TFA_RTMat, scw, sch)
         render_PopRenderTarget()
 
-        if TFA_RTMat and TFA_RTMat.SetTexture then
-            TFA_RTMat:SetTexture("$basetexture", TFA_RTScreen)
-        end
-
-        local override = wep.RTMaterialOverride
-        if override and override >= 0 then
-            if vm.SetSubMaterial then
-                vm:SetSubMaterial(override, "!tfa_rtmaterial")
-            end
+        TFA_RTMat:SetTexture("$basetexture", TFA_RTScreen)
+        if wep.RTMaterialOverride and wep.RTMaterialOverride >= 0 then
+            wep.Owner:GetViewModel():SetSubMaterial(wep.RTMaterialOverride, "!tfa_rtmaterial")
         end
 
         TFA_RENDERSCREEN = false

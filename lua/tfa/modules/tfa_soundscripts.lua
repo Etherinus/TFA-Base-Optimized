@@ -1,11 +1,6 @@
 if SERVER then AddCSLuaFile() end
 
-local sound_Add = sound and sound.Add
-if not sound_Add then
-    return
-end
-
-sound_Add({
+sound.Add({
     name = "Weapon_Bow.1",
     channel = CHAN_STATIC,
     volume = 1,
@@ -16,7 +11,7 @@ sound_Add({
     }
 })
 
-sound_Add({
+sound.Add({
     name = "Weapon_Bow.boltpull",
     channel = CHAN_USER_BASE + 11,
     volume = 1,
@@ -27,7 +22,7 @@ sound_Add({
     }
 })
 
-sound_Add({
+sound.Add({
     name = "TFA.Bash",
     channel = CHAN_USER_BASE + 13,
     volume = 1,
@@ -38,7 +33,7 @@ sound_Add({
     pitch = { 97, 103 }
 })
 
-sound_Add({
+sound.Add({
     name = "TFA.BashWall",
     channel = CHAN_USER_BASE + 13,
     volume = 1,
@@ -46,7 +41,7 @@ sound_Add({
     pitch = { 97, 103 }
 })
 
-sound_Add({
+sound.Add({
     name = "TFA.BashFlesh",
     channel = CHAN_USER_BASE + 13,
     volume = 1,
@@ -61,7 +56,7 @@ sound_Add({
     pitch = { 97, 103 }
 })
 
-sound_Add({
+sound.Add({
     name = "TFA.IronIn",
     channel = CHAN_USER_BASE + 13,
     volume = 1,
@@ -69,7 +64,7 @@ sound_Add({
     pitch = { 97, 103 }
 })
 
-sound_Add({
+sound.Add({
     name = "TFA.IronOut",
     channel = CHAN_USER_BASE + 13,
     volume = 1,
@@ -77,7 +72,7 @@ sound_Add({
     pitch = { 97, 103 }
 })
 
-sound_Add({
+sound.Add({
     name = "Weapon_Pistol.Empty2",
     channel = CHAN_USER_BASE + 11,
     volume = 1,
@@ -86,7 +81,7 @@ sound_Add({
     pitch = { 97, 103 }
 })
 
-sound_Add({
+sound.Add({
     name = "Weapon_AR2.Empty2",
     channel = CHAN_USER_BASE + 11,
     volume = 1,

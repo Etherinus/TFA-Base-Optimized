@@ -2,49 +2,30 @@ TFA = TFA or {}
 TFA.Attachments = TFA.Attachments or {}
 TFA.Attachments.Atts = TFA.Attachments.Atts or {}
 
-local ColorFn = Color
-local ScrWFn = ScrW
-local ScrHFn = ScrH
+TFA.Attachments.Colors = TFA.Attachments.Colors or {
+    active = Color(252, 151, 50, 255),
+    error = Color(225, 0, 0, 255),
+    background = Color(15, 15, 15, 64),
+    primary = Color(245, 245, 245, 255),
+    secondary = Color(153, 253, 220, 255),
+    ["+"] = Color(128, 255, 128, 255),
+    ["-"] = Color(255, 128, 128, 255),
+    ["="] = Color(192, 192, 192, 255)
+}
 
-local attachments = TFA.Attachments
-
-if not attachments.Colors then
-    attachments.Colors = {
-        active = ColorFn(252, 151, 50, 255),
-        error = ColorFn(225, 0, 0, 255),
-        background = ColorFn(15, 15, 15, 64),
-        primary = ColorFn(245, 245, 245, 255),
-        secondary = ColorFn(153, 253, 220, 255),
-        ["+"] = ColorFn(128, 255, 128, 255),
-        ["-"] = ColorFn(255, 128, 128, 255),
-        ["="] = ColorFn(192, 192, 192, 255)
-    }
-end
-
-attachments.UIPadding = attachments.UIPadding or 2
-attachments.Path = attachments.Path or "tfa/att/"
-
+TFA.Attachments.UIPadding = TFA.Attachments.UIPadding or 2
+TFA.Attachments.Path = TFA.Attachments.Path or "tfa/att/"
 TFA_ATTACHMENT_ISUPDATING = TFA_ATTACHMENT_ISUPDATING or false
-TFA.AttachmentColors = TFA.AttachmentColors or attachments.Colors
-
-local soundAdd = sound and sound.Add
-local typeFn = type
+TFA.AttachmentColors = TFA.AttachmentColors or TFA.Attachments.Colors
 
 if not TFA.AddSound then
     function TFA.AddSound(id, channel, volume, level, pitch, path)
-        if not id or not soundAdd then return end
+        if not id then return end
 
-        local snd = path
-        if snd == nil then
-            local tp = typeFn(pitch)
-            if tp == "string" or tp == "table" then
-                snd = pitch
-            end
-        end
+        local snd = path or pitch
+        if not snd then return end
 
-        if snd == nil then return end
-
-        soundAdd({
+        sound.Add({
             name = id,
             channel = channel or CHAN_AUTO,
             volume = volume or 1,
@@ -57,7 +38,7 @@ end
 
 if not ScaleH then
     function ScaleH(val)
-        local h = ScrHFn()
+        local h = ScrH()
         if h <= 0 then return val end
         return val * (h / 1080)
     end
@@ -65,27 +46,20 @@ end
 
 if not ScaleW then
     function ScaleW(val)
-        local w = ScrWFn()
+        local w = ScrW()
         if w <= 0 then return val end
         return val * (w / 1920)
     end
 end
 
-if CLIENT then
-    local ConVarExistsFn = ConVarExists
-    local CreateClientConVarFn = CreateClientConVar
 
-    if ConVarExistsFn and CreateClientConVarFn and not ConVarExistsFn("cl_tfa_changelog") then
-        CreateClientConVarFn("cl_tfa_changelog", "0", true, false)
+if CLIENT then
+    if not ConVarExists("cl_tfa_changelog") then
+        CreateClientConVar("cl_tfa_changelog", "0", true, false)
     end
 end
 
 TFA.Effects = TFA.Effects or {}
-
-do
-    local utilEffect = util and util.Effect
-    function TFA.Effects.Create(name, data)
-        if not utilEffect or not name or name == "" then return end
-        utilEffect(name, data)
-    end
+function TFA.Effects.Create(name, data)
+    util.Effect(name, data)
 end

@@ -1,7 +1,7 @@
 local IsValid = IsValid
 local hook_Add = hook.Add
 
-local block = {
+local TFA_PocketBlock = {
     tfa_ammo_357 = true,
     tfa_ammo_ar2 = true,
     tfa_ammo_buckshot = true,
@@ -19,9 +19,15 @@ local block = {
     tfa_ammo_winchester = true
 }
 
-hook_Add("canPocket", "TFA_PockBlock", function(_, wep)
-    if not IsValid(wep) then return end
-    if block[wep:GetClass()] then
+local function TFA_PockBlock(_, wep)
+    if not IsValid(wep) then
+        return
+    end
+
+    local class = wep:GetClass()
+    if TFA_PocketBlock[class] then
         return false
     end
-end)
+end
+
+hook_Add("canPocket", "TFA_PockBlock", TFA_PockBlock)

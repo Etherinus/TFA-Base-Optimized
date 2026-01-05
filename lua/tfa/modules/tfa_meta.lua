@@ -1,7 +1,6 @@
-local FindMetaTable = FindMetaTable
-local meta = FindMetaTable and FindMetaTable("Weapon") or nil
+local meta = FindMetaTable("Weapon")
 
-if meta and not meta.IsTFA then
+if meta then
     function meta:IsTFA()
         return self.IsTFAWeapon or false
     end

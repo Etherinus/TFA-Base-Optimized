@@ -1,26 +1,17 @@
 local bvec = Vector(0, 0, 0)
 local uAng = Angle(90, 0, 0)
 
-local IsValid = IsValid
-local LocalPlayer = LocalPlayer
-local EffectData = EffectData
-
-local game_SinglePlayer = game.SinglePlayer
-
 function EFFECT:Init(data)
 	self.Position = bvec
-
-	local wep = data:GetEntity()
-	if not IsValid(wep) then return end
-
-	self.WeaponEntOG = wep
-	self.WeaponEnt = wep
+	self.WeaponEnt = data:GetEntity()
+	if not IsValid(self.WeaponEnt) then return end
+	self.WeaponEntOG = self.WeaponEnt
 	self.Attachment = data:GetAttachment()
 	self.Dir = data:GetNormal()
+	local owent = self.WeaponEnt.Owner or self.WeaponEnt:GetOwner()
 
-	local owent = wep.Owner or wep:GetOwner()
 	if not IsValid(owent) then
-		owent = wep:GetParent()
+		owent = self.WeaponEnt:GetParent()
 	end
 
 	if IsValid(owent) and owent:IsPlayer() then
@@ -30,22 +21,24 @@ function EFFECT:Init(data)
 		else
 			self.WeaponEnt = owent:GetViewModel()
 			local theirweapon = owent:GetActiveWeapon()
-			if IsValid(theirweapon) and (theirweapon.ViewModelFlip or theirweapon.ViewModelFlipped) then
+
+			if IsValid(theirweapon) and theirweapon.ViewModelFlip or theirweapon.ViewModelFlipped then
 				self.Flipped = true
 			end
+
 			if not IsValid(self.WeaponEnt) then return end
 		end
 	end
 
 	if IsValid(self.WeaponEntOG) and self.WeaponEntOG.ShellAttachment then
 		self.Attachment = self.WeaponEnt:LookupAttachment(self.WeaponEntOG.ShellAttachment)
+
 		if not self.Attachment or self.Attachment <= 0 then
 			self.Attachment = 2
 		end
 
 		if self.WeaponEntOG.Akimbo then
-			local cycle = game_SinglePlayer() and self.WeaponEntOG:GetNW2Int("AnimCycle", 1) or self.WeaponEntOG.AnimCycle
-			self.Attachment = 4 - cycle
+			self.Attachment = 4 - ( game.SinglePlayer() and self.WeaponEntOG:GetNW2Int("AnimCycle",1) or self.WeaponEntOG.AnimCycle )
 		end
 
 		if self.WeaponEntOG.ShellAttachmentRaw then
@@ -54,8 +47,12 @@ function EFFECT:Init(data)
 	end
 
 	local angpos = self.WeaponEnt:GetAttachment(self.Attachment)
+
 	if not angpos or not angpos.Pos then
-		angpos = { Pos = bvec, Ang = uAng }
+		angpos = {
+			Pos = bvec,
+			Ang = uAng
+		}
 	end
 
 	if self.Flipped then
@@ -63,15 +60,17 @@ function EFFECT:Init(data)
 		local localang = self.WeaponEnt:WorldToLocalAngles(tmpang)
 		localang.y = localang.y + 180
 		localang = self.WeaponEnt:LocalToWorldAngles(localang)
+		--localang:RotateAroundAxis(localang:Up(),180)
+		--tmpang:RotateAroundAxis(tmpang:Up(),180)
 		self.Dir = localang:Forward()
 	end
 
+	-- Keep the start and end Pos - we're going to interpolate between them
 	self.Pos = self:GetTracerShootPos(angpos.Pos, self.WeaponEnt, self.Attachment)
-	self.Norm = angpos.Ang:Forward()
-
+	self.Norm =  angpos.Ang:Forward() --angpos.Ang:Forward()
+	--print(self.Norm)
 	self.Magnitude = data:GetMagnitude()
 	self.Scale = data:GetScale()
-
 	local fx = EffectData()
 	fx:SetOrigin(self.Pos)
 	fx:SetStart(self.Pos)
@@ -81,7 +80,6 @@ function EFFECT:Init(data)
 	fx:SetAngles(self.Norm:Angle())
 	fx:SetScale(self.Scale)
 	fx:SetMagnitude(self.Magnitude)
-
 	local se = (self.WeaponEntOG.LuaShellEffect or self.WeaponEntOG.Blowback_Shell_Effect) or "ShellEject"
 	util.Effect(se, fx)
 end

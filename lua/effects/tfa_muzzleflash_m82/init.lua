@@ -1,18 +1,8 @@
-local VectorRand = VectorRand
-local ParticleEmitter = ParticleEmitter
-local DynamicLight = DynamicLight
-local CurTime = CurTime
-local IsValid = IsValid
-local LocalPlayer = LocalPlayer
-local Entity = Entity
-
-local math_Round = math.Round
-local math_max = math.max
-
 local function rvec(vec)
-	vec.x = math_Round(vec.x)
-	vec.y = math_Round(vec.y)
-	vec.z = math_Round(vec.z)
+	vec.x = math.Round(vec.x)
+	vec.y = math.Round(vec.y)
+	vec.z = math.Round(vec.z)
+
 	return vec
 end
 
@@ -21,59 +11,73 @@ local blankvec = Vector(0, 0, 0)
 function EFFECT:Init(data)
 	self.StartPacket = data:GetStart()
 	self.Attachment = data:GetAttachment()
+	local AddVel = vector_origin
 
-	local addVel = vector_origin
-	local lp = LocalPlayer()
-	if lp and IsValid(lp) then
-		addVel = lp:GetVelocity()
+	if LocalPlayer and IsValid(LocalPlayer()) then
+		AddVel = LocalPlayer():GetVelocity()
 	end
-	if addVel == vector_origin and game.SinglePlayer() then
-		local p1 = Entity(1)
-		if IsValid(p1) then
-			addVel = p1:GetVelocity()
-		end
+
+	if AddVel == vector_origin then
+		AddVel = Entity(1):GetVelocity()
 	end
 
 	self.Position = data:GetOrigin()
 	self.Forward = data:GetNormal()
+	self.Angle = self.Forward:Angle()
+	self.Right = self.Angle:Right()
+	local wepent = Entity(math.Round(self.StartPacket.z))
 
-	local wepent = Entity(math_Round(self.StartPacket.z))
 	if IsValid(wepent) and wepent.IsFirstPerson and not wepent:IsFirstPerson() then
 		data:SetEntity(wepent)
 		self.Position = blankvec
 	end
 
-	local ownerent = player.GetByID(math_Round(self.StartPacket.x))
-	local serverside = (math_Round(self.StartPacket.y) == 1)
+	local ownerent = player.GetByID(math.Round(self.StartPacket.x))
+	local serverside = false
+
+	if math.Round(self.StartPacket.y) == 1 then
+		serverside = true
+	end
 
 	local ent = data:GetEntity()
+
 	if serverside and IsValid(ownerent) then
-		if lp == ownerent then return end
+		if LocalPlayer() == ownerent then return end
 		ent = ownerent:GetActiveWeapon()
-		addVel = ownerent:GetVelocity()
+		AddVel = ownerent:GetVelocity()
 	end
 
 	if (not self.Position) or (rvec(self.Position) == blankvec) then
 		self.WeaponEnt = data:GetEntity()
 		self.Attachment = data:GetAttachment()
 
-		if IsValid(self.WeaponEnt) then
+		if self.WeaponEnt and IsValid(self.WeaponEnt) then
 			local rpos = self.WeaponEnt:GetAttachment(self.Attachment)
+
 			if rpos and rpos.Pos then
 				self.Position = rpos.Pos
+
 				if data:GetNormal() == vector_origin then
 					self.Forward = rpos.Ang:Up()
+					self.Angle = self.Forward:Angle()
+					self.Right = self.Angle:Right()
 				end
 			end
 		end
 	end
 
-	local dir = self.Forward
-	addVel = addVel * 0.05
+	self.vOffset = self.Position
+	dir = self.Forward
+	AddVel = AddVel * 0.05
 
-	local dlight = IsValid(ent) and DynamicLight(ent:EntIndex()) or DynamicLight(0)
-	if dlight then
-		dlight.Pos = self.Position + dir - dir:Angle():Right() * 5
+	if IsValid(ent) then
+		dlight = DynamicLight(ent:EntIndex())
+	else
+		dlight = DynamicLight(0)
+	end
+
+	if (dlight) then
+		dlight.Pos = self.Position + dir * 1 - dir:Angle():Right() * 5
 		dlight.r = 180
 		dlight.g = 120
 		dlight.b = 40
@@ -83,7 +87,7 @@ function EFFECT:Init(data)
 		dlight.Fade = 1000
 	end
 
-	local att = math_max(1, data:GetAttachment())
+	local att = math.max(1, data:GetAttachment())
 	ParticleEffectAttach("tfa_muzzle_m82", PATTACH_POINT_FOLLOW, ent, att)
 end
 

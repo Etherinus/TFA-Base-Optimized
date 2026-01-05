@@ -1,40 +1,32 @@
+--[[ AddCSLua our other essential functions. ]]--
 AddCSLuaFile("cl_init.lua")
 AddCSLuaFile("shared.lua")
-
+--[[ Load up our shared code. ]]--
 include("shared.lua")
 
-local function IterateModuleList(t, fn)
-	if not istable(t) then return end
+--[[ Include these modules]]--
+for k, v in pairs(SWEP.SV_MODULES) do
+	include(v)
+end
 
-	if #t > 0 then
-		for i = 1, #t do
-			local v = t[i]
-			if isstring(v) and v ~= "" then
-				fn(v)
-			end
-		end
-	else
-		for _, v in pairs(t) do
-			if isstring(v) and v ~= "" then
-				fn(v)
-			end
-		end
+--[[ Include these modules, and AddCSLua them, since they're shared.]]--
+for k, v in pairs(SWEP.SH_MODULES) do
+	AddCSLuaFile(v)
+	include(v)
+end
+
+--[[ Include these modules if singleplayer, and AddCSLua them, since they're clientside.]]--
+for k, v in pairs(SWEP.ClSIDE_MODULES) do
+	AddCSLuaFile(v)
+end
+
+if game.SinglePlayer() then
+	for k, v in pairs(SWEP.ClSIDE_MODULES) do
+		include(v)
 	end
 end
 
-IterateModuleList(SWEP.SV_MODULES, include)
-
-IterateModuleList(SWEP.SH_MODULES, function(v)
-	AddCSLuaFile(v)
-	include(v)
-end)
-
-IterateModuleList(SWEP.ClSIDE_MODULES, AddCSLuaFile)
-
-if game.SinglePlayer() then
-	IterateModuleList(SWEP.ClSIDE_MODULES, include)
-end
-
-SWEP.Weight = 60
-SWEP.AutoSwitchTo = true
-SWEP.AutoSwitchFrom = true
+--[[Actual serverside values]]--
+SWEP.Weight = 60 -- Decides whether we should switch from/to this
+SWEP.AutoSwitchTo = true -- Auto switch to
+SWEP.AutoSwitchFrom = true -- Auto switch from

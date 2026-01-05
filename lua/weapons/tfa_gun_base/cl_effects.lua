@@ -1,155 +1,124 @@
-local IsValid = IsValid
-local CurTime = CurTime
-local timer_Simple = timer.Simple
-local math_Clamp = math.Clamp
-local math_floor = math.floor
-local surface = surface
-local render = render
-local util = util
-local net = net
-local ParticleEffectAttach = ParticleEffectAttach
-local PATTACH_POINT_FOLLOW = PATTACH_POINT_FOLLOW
-local DamageInfo = DamageInfo
-local EffectData = EffectData
-local math_sqrt = math.sqrt
-
+--[[
+Function Name:  FireAnimationEvent
+Syntax: self:FireAnimationEvent( position, angle, event id, options).
+Returns:  Nothing.
+Notes:    Used to capture and disable viewmodel animation events, unless you disable that feature.
+Purpose:  FX
+]]--
 function SWEP:FireAnimationEvent(pos, ang, event, options)
-    if self.CustomMuzzleFlash or not self.MuzzleFlashEnabled then
-        if event == 21 then
-            return true
-        end
+	if self.CustomMuzzleFlash or not self.MuzzleFlashEnabled then
+		-- Disables animation based muzzle event
+		if (event == 21) then return true end
+		-- Disable thirdperson muzzle flash
+		if (event == 5003) then return true end
 
-        if event == 5003 then
-            return true
-        end
+		-- Disable CS-style muzzle flashes, but chance our muzzle flash attachment if one is given.
+		if (event == 5001 or event == 5011 or event == 5021 or event == 5031) then
+			if self.AutoDetectMuzzleAttachment then
+				self.MuzzleAttachmentRaw = math.Clamp(math.floor((event - 4991) / 10), 1, 4)
+				net.Start("tfa_base_muzzle_mp")
+				net.SendToServer()
 
-        if event == 5001 or event == 5011 or event == 5021 or event == 5031 then
-            if self.AutoDetectMuzzleAttachment then
-                self.MuzzleAttachmentRaw = math_Clamp(math_floor((event - 4991) / 10), 1, 4)
+				timer.Simple(0, function()
+					if IsValid(self) then
+						self:ShootEffectsCustom(true)
+					end
+				end)
+			end
 
-                if net and net.Start then
-                    net.Start("tfa_base_muzzle_mp")
-                    net.SendToServer()
-                end
+			return true
+		end
+	end
 
-                timer_Simple(0, function()
-                    if IsValid(self) then
-                        self:ShootEffectsCustom(true)
-                    end
-                end)
-            end
-
-            return true
-        end
-    end
-
-    if self.LuaShellEject and event ~= 5004 then
-        return true
-    end
+	if (self.LuaShellEject and event ~= 5004) then return true end
 end
 
+--[[
+Function Name:  MakeMuzzleSmoke
+Syntax: self:MakeMuzzleSmoke( entity, attachment).
+Returns:  Nothing.
+Notes:    Used to make the muzzle smoke effect, clientside.
+Purpose:  FX
+]]--
 function SWEP:MakeMuzzleSmoke(entity, attachment)
-    self:CleanParticles()
+	self:CleanParticles()
+	local ht = self.DefaultHoldType and self.DefaultHoldType or self.HoldType
 
-    local ht = self.DefaultHoldType or self.HoldType
-    if not (CLIENT and TFA and TFA.GetMZSmokeEnabled and TFA.GetMZSmokeEnabled()) then
-        return
-    end
-
-    if not (IsValid(entity) and attachment and attachment ~= 0) then
-        return
-    end
-
-    local pfx = self.SmokeParticles and self.SmokeParticles[ht]
-    if not pfx or pfx == "" then
-        return
-    end
-
-    ParticleEffectAttach(pfx, PATTACH_POINT_FOLLOW, entity, attachment)
+	if (CLIENT and TFA.GetMZSmokeEnabled() and IsValid(entity) and attachment and attachment ~= 0) then
+		ParticleEffectAttach(self.SmokeParticles[ht], PATTACH_POINT_FOLLOW, entity, attachment)
+	end
 end
+
+--[[
+Function Name:  ImpactEffect
+Syntax: self:ImpactEffect( position, normal (ang:Up()), materialt ype).
+Returns:  Nothing.
+Notes:    Used to make the impact effect.  See utilities code for CanDustEffect.
+Purpose:  FX
+]]--
 
 function SWEP:DoImpactEffect(tr, dmgtype)
-    if tr.HitSky then
-        return true
-    end
+	if tr.HitSky then return true end
+	local ib = self.BashBase and IsValid(self) and self:GetBashing()
+	local dmginfo = DamageInfo()
+	dmginfo:SetDamageType(dmgtype)
 
-    local ib = self.BashBase and self.GetBashing and self:GetBashing()
-    local dmginfo = DamageInfo()
-    dmginfo:SetDamageType(dmgtype)
+	if dmginfo:IsDamageType(DMG_SLASH) or (ib and self.Secondary.BashDamageType == DMG_SLASH and tr.MatType ~= MAT_FLESH and tr.MatType ~= MAT_ALIENFLESH) or (self and self.DamageType and self.DamageType == DMG_SLASH) then
+		util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
 
-    local isSlash = dmginfo:IsDamageType(DMG_SLASH)
-    local bashSlash = ib and self.Secondary and self.Secondary.BashDamageType == DMG_SLASH and tr.MatType ~= MAT_FLESH and tr.MatType ~= MAT_ALIENFLESH
-    local wepSlash = self.DamageType == DMG_SLASH
+		return true
+	end
 
-    if isSlash or bashSlash or wepSlash then
-        util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
-        return true
-    end
+	if ib and self.Secondary.BashDamageType == DMG_GENERIC then return true end
+	if ib then return end
 
-    if ib and self.Secondary and self.Secondary.BashDamageType == DMG_GENERIC then
-        return true
-    end
+	if IsValid(self) then
+		self:ImpactEffectFunc(tr.HitPos, tr.HitNormal, tr.MatType)
+	end
 
-    if ib then
-        return
-    end
+	if self.ImpactDecal and self.ImpactDecal ~= "" then
+		util.Decal(self.ImpactDecal, tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
 
-    if IsValid(self) then
-        self:ImpactEffectFunc(tr.HitPos, tr.HitNormal, tr.MatType)
-    end
-
-    if self.ImpactDecal and self.ImpactDecal ~= "" then
-        util.Decal(self.ImpactDecal, tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
-        return true
-    end
+		return true
+	end
 end
 
 local impact_cl_enabled = GetConVar("cl_tfa_fx_impact_enabled")
 local impact_sv_enabled = GetConVar("sv_tfa_fx_impact_override")
 
 function SWEP:ImpactEffectFunc(pos, normal, mattype)
-    local enabled = true
+	local enabled
 
-    if impact_cl_enabled then
-        enabled = impact_cl_enabled:GetBool()
-    end
+	if impact_cl_enabled then
+		enabled = impact_cl_enabled:GetBool()
+	else
+		enabled = true
+	end
 
-    if impact_sv_enabled and impact_sv_enabled:GetInt() >= 0 then
-        enabled = impact_sv_enabled:GetBool()
-    end
+	if impact_sv_enabled and impact_sv_enabled:GetInt() >= 0 then
+		enabled = impact_sv_enabled:GetBool()
+	end
 
-    if not enabled then
-        return
-    end
+	if enabled then
+		local fx = EffectData()
+		fx:SetOrigin(pos)
+		fx:SetNormal(normal)
 
-    local fx = EffectData()
-    fx:SetOrigin(pos)
-    fx:SetNormal(normal)
+		if self:CanDustEffect(mattype) then
+			util.Effect("tfa_dust_impact", fx)
+		end
 
-    if self.CanDustEffect and self:CanDustEffect(mattype) then
-        util.Effect("tfa_dust_impact", fx)
-    end
+		if self:CanSparkEffect(mattype) then
+			util.Effect("tfa_metal_impact", fx)
+		end
 
-    if self.CanSparkEffect and self:CanSparkEffect(mattype) then
-        util.Effect("tfa_metal_impact", fx)
-    end
+		fx:SetEntity(self.Owner)
+		fx:SetMagnitude(mattype or 0)
+		fx:SetScale(math.sqrt(self.Primary.Damage / 30))
+		util.Effect("tfa_bullet_impact", fx)
 
-    local owner = self.GetOwner and self:GetOwner() or self.Owner
-    if IsValid(owner) then
-        fx:SetEntity(owner)
-    end
-
-    fx:SetMagnitude(mattype or 0)
-
-    local dmg = (self.Primary and self.Primary.Damage) or 30
-    if dmg <= 0 then
-        dmg = 30
-    end
-
-    fx:SetScale(math_sqrt(dmg / 30))
-    util.Effect("tfa_bullet_impact", fx)
-
-    if self.ImpactEffect then
-        util.Effect(self.ImpactEffect, fx)
-    end
+		if self.ImpactEffect then
+			util.Effect(self.ImpactEffect, fx)
+		end
+	end
 end

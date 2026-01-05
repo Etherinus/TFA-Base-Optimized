@@ -3,41 +3,34 @@ if browserpool then return end
 
 local table_insert = table.insert
 local table_remove = table.remove
+local table_KeyFromValue = table.KeyFromValue
+local vgui_Create = vgui.Create
+local pairs = pairs
 local IsValid = IsValid
 local ErrorNoHalt = ErrorNoHalt
 local debug_Trace = debug.Trace
-local pairs = pairs
 local next = next
-local tostring = tostring
-
-local vgui_Create = vgui and vgui.Create
-local NULL = NULL
 
 browserpool = browserpool or {}
 
 local available = {}
 local active = {}
-local activeIndex = {}
 local pending = {}
-local pendingQueue = {}
-local pendingHead = 1
 
 local numMin = 2
 local numMax = 4
 local numActive = 0
-
+local numPending = 0
+local numRequests = 0
 local defaultUrl = "about:blank"
 local JS_RemoveProp = "delete %s.%s;"
 
 local function setupPanel(panel)
     if not panel then
-        if not vgui_Create then return nil end
-        panel = vgui_Create("DMediaPlayerHTML") or vgui_Create("Awesomium") or vgui_Create("DHTML")
-        if not panel then return nil end
-        panel:SetVisible(false)
+        panel = vgui_Create("DMediaPlayerHTML")
     end
 
-    if panel.Stop then panel:Stop() end
+    panel:Stop()
     panel:SetPos(0, 0)
     panel:SetKeyboardInputEnabled(false)
     panel:SetMouseInputEnabled(false)
@@ -58,60 +51,31 @@ local function setupPanel(panel)
     return panel
 end
 
-local function activeAdd(panel)
-    local idx = #active + 1
-    active[idx] = panel
-    activeIndex[panel] = idx
-end
-
-local function activeRemove(panel)
-    local idx = activeIndex[panel]
-    if not idx then return false end
-
-    local last = #active
-    local lastPanel = active[last]
-
-    active[idx] = lastPanel
-    active[last] = nil
-
-    activeIndex[panel] = nil
-    if lastPanel then
-        activeIndex[lastPanel] = idx
+local function removePromise(promise)
+    local id = promise:GetId()
+    if not pending[id] then
+        ErrorNoHalt("browserpool: Failed to remove promise.\n")
+        debug_Trace()
+        return false
     end
+
+    pending[id] = nil
+    numPending = numPending - 1
 
     return true
-end
-
-local function pendingEnqueue(promise)
-    local id = promise.id
-    pending[id] = promise
-    pendingQueue[#pendingQueue + 1] = id
-end
-
-local function pendingDequeue()
-    for i = pendingHead, #pendingQueue do
-        local id = pendingQueue[i]
-        pendingQueue[i] = nil
-        pendingHead = i + 1
-        if id ~= nil then
-            local p = pending[id]
-            if p then
-                pending[id] = nil
-                return p
-            end
-        end
-    end
-
-    pendingQueue = {}
-    pendingHead = 1
-    return nil
 end
 
 local BrowserPromise = {}
 BrowserPromise.__index = BrowserPromise
 
 local function newPromise(callback, id)
-    return setmetatable({ cb = callback, id = id }, BrowserPromise)
+    return setmetatable(
+        {
+            cb = callback,
+            id = id
+        },
+        BrowserPromise
+    )
 end
 
 function BrowserPromise:GetId()
@@ -119,52 +83,36 @@ function BrowserPromise:GetId()
 end
 
 function BrowserPromise:Resolve(value)
-    local cb = self.cb
-    if cb then
-        self.cb = nil
-        cb(value)
-    end
+    self.cb(value)
 end
 
 function BrowserPromise:Cancel(reason)
-    local cb = self.cb
-    if cb then
-        self.cb = nil
-        cb(false, reason)
-    end
-    pending[self.id] = nil
+    self.cb(false, reason)
+    removePromise(self)
 end
 
-local numRequests = 0
-
 function browserpool.get(callback)
-    if type(callback) ~= "function" then return nil end
-
     numRequests = numRequests + 1
 
-    local panel = available[#available]
-    if panel then
-        available[#available] = nil
-        activeAdd(panel)
+    if #available > 0 then
+        local panel = table_remove(available)
+        table_insert(active, panel)
         callback(panel)
         return
     end
 
     if numActive < numMax then
-        panel = setupPanel(nil)
-        if not panel then
-            callback(NULL)
-            return NULL
-        end
-
+        local panel = setupPanel()
         numActive = numActive + 1
-        activeAdd(panel)
+        table_insert(active, panel)
         callback(panel)
         return
     end
 
     local promise = newPromise(callback, numRequests)
-    pendingEnqueue(promise)
+    pending[numRequests] = promise
+    numPending = numPending + 1
+
     return promise
 end
 
@@ -173,58 +121,47 @@ function browserpool.release(panel, destroy)
         return false
     end
 
-    if not activeIndex[panel] then
+    local key = table_KeyFromValue(active, panel)
+    if not key then
         ErrorNoHalt("browserpool: Attempted to release unactive browser.\n")
         debug_Trace()
+
         if IsValid(panel) then
             panel:Remove()
         end
+
         return false
     end
 
-    if destroy then
-        activeRemove(panel)
-        if IsValid(panel) then
-            panel:Remove()
-        end
-        numActive = numActive - 1
-        if numActive < 0 then numActive = 0 end
-        return true
-    end
-
-    local promise = pendingDequeue()
-    if promise then
+    if numPending > 0 and not destroy then
         setupPanel(panel)
-        promise:Resolve(panel)
-        return true
-    end
 
-    activeRemove(panel)
-
-    if numActive > numMin then
-        if IsValid(panel) then
-            panel:Remove()
+        local id = next(pending)
+        if id then
+            local promise = pending[id]
+            promise:Resolve(panel)
+            removePromise(promise)
         end
-        numActive = numActive - 1
-        if numActive < 0 then numActive = 0 end
-        return true
+    else
+        if not table_remove(active, key) then
+            ErrorNoHalt("browserpool: Failed to remove panel from active browsers.\n")
+            debug_Trace()
+
+            if IsValid(panel) then
+                panel:Remove()
+            end
+
+            return false
+        end
+
+        if numActive > numMin then
+            panel:Remove()
+            numActive = numActive - 1
+        elseif not destroy then
+            setupPanel(panel)
+            table_insert(available, panel)
+        end
     end
 
-    setupPanel(panel)
-    available[#available + 1] = panel
     return true
-end
-
-function browserpool.stats()
-    local a = #available
-    local b = #active
-    local p = 0
-    for _ in pairs(pending) do p = p + 1 end
-    return {
-        available = a,
-        active = b,
-        allocated = numActive,
-        pending = p,
-        requests = numRequests
-    }
 end
