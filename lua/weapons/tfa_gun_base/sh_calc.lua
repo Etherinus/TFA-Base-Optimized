@@ -41,6 +41,7 @@ function SWEP:CalculateRatios()
 		self.CrouchingRatio = l_Lerp(ft * 15, self.CrouchingRatio or 0,cr)
 	end
 	self.SpreadRatio = l_mathClamp(self.SpreadRatio - self.Primary.SpreadRecovery * ft, 1, self.Primary.SpreadMultiplierMax)
+	self.RecoilRatio = l_mathClamp((self.RecoilRatio or 1) - self.Primary.RecoilRecovery * ft, 1, self.Primary.RecoilMultiplierMax)
 	if ist ~= self.IronSightsProgress then
 		self.IronSightsProgress = l_Lerp(ft * adstransitionspeed, self.IronSightsProgress, ist)
 	end
@@ -86,7 +87,7 @@ function SWEP:CalculateConeRecoil()
 	local isr_1 = l_mathClamp(isr * 2, 0, 1)
 	local isr_2 = l_mathClamp((isr - 0.5) * 2, 0, 1)
 	local acv = self.Primary.Spread or self.Primary.Accuracy
-	local recv = self.Primary.Recoil * 5
+	local recv = self.Primary.Recoil * 5 * (self.RecoilRatio or 1)
 
 	if dynacc then
 		ccon = l_Lerp(isr_2, l_Lerp(isr_1, acv, acv * self.ChangeStateAccuracyMultiplier), self.Primary.IronAccuracy)

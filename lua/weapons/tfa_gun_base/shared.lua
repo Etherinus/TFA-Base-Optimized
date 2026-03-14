@@ -176,6 +176,9 @@ SWEP.Primary.KickUp = 0.5
 SWEP.Primary.KickDown = 0.5
 SWEP.Primary.KickRight = 0.5
 SWEP.Primary.KickHorizontal = 0.5
+SWEP.Primary.RecoilMultiplierMax = 1 --How far the recoil can expand when you shoot.
+SWEP.Primary.RecoilIncrement = 0 --What percentage of the modifier is added on, per shot.
+SWEP.Primary.RecoilRecovery = 0 --How much the recoil recovers, per second.
 SWEP.Primary.DamageType = nil
 SWEP.Primary.Ammo = "smg1"
 SWEP.Primary.AmmoConsumption = 1
@@ -334,6 +337,7 @@ SWEP.SprintAnimation = {
 SWEP.IronSightsProgress = 0
 SWEP.SprintProgress = 0
 SWEP.SpreadRatio = 0
+SWEP.RecoilRatio = 1
 SWEP.CrouchingRatio = 0
 SWEP.SmokeParticles = {}
 

@@ -157,6 +157,7 @@ function SWEP:Recoil(recoil, ifp)
 
 	if ifp then
 		self.SpreadRatio = l_mathClamp(self.SpreadRatio + self.Primary.SpreadIncrement, 1, self.Primary.SpreadMultiplierMax)
+		self.RecoilRatio = l_mathClamp((self.RecoilRatio or 1) + self.Primary.RecoilIncrement, 1, self.Primary.RecoilMultiplierMax)
 	end
 
 	math.randomseed(self:GetSeed() + 1)

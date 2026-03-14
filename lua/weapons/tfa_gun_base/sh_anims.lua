@@ -15,6 +15,8 @@ local d,pbr
 
 function SWEP:SendViewModelAnim(act, rate, targ, blend )
 	local vm = self.OwnerViewModel
+	act = tonumber(act)
+	if not act then return false, -1 end
 	self:SetLastActivity( act )
 	if rate and not targ then rate = math.max(rate,0.0001) end
 
@@ -66,8 +68,11 @@ function SWEP:SendViewModelSeq(seq, rate, targ, blend )
 	if type(seq) == "string" then
 		seq = vm:LookupSequence(seq) or 0
 	end
+	seq = tonumber(seq)
+	if not seq then return false, -1 end
 
 	local act = vm:GetSequenceActivity(seq)
+	if type(act) ~= "number" then act = -1 end
 	self:SetLastActivity( act )
 	if seq < 0 then
 		return
